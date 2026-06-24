@@ -101,10 +101,23 @@ class TestRebalancingRule:
         engine.run_cycle()
         actions["rebalance"].execute.assert_not_called()
 
-    def test_zero_revenue_channel_not_rebalanced(self, base_config):
-        imbalanced = [{"chan_id": "111x1x0", "peer_alias": "DeadEarner", "peer_pubkey": "02aaa",
+    def test_new_channel_cheap_rebalance_proceeds(self, base_config):
+        """New channels with no revenue get rebalanced if cost under 500 sat cap."""
+        imbalanced = [{"chan_id": "111x1x0", "peer_alias": "NewPeer", "peer_pubkey": "02aaa",
                        "local_balance_pct": 10.0, "local_balance_sats": 200_000,
-                       "capacity_sats": 2_000_000, "estimated_rebalance_cost_sats": 1}]
+                       "capacity_sats": 2_000_000, "estimated_rebalance_cost_sats": 100}]
+        engine, actions, _ = make_engine(base_config, {
+            "mempool": {"fee_rate_sat_vbyte": 8},
+            "lndg": {"imbalanced_channels": imbalanced, "routing_revenue_7d": {}},
+        })
+        engine.run_cycle()
+        actions["rebalance"].execute.assert_called_once()
+
+    def test_new_channel_expensive_rebalance_skipped(self, base_config):
+        """New channels with no revenue skipped if cost exceeds 500 sat cap."""
+        imbalanced = [{"chan_id": "111x1x0", "peer_alias": "ExpensiveNewPeer", "peer_pubkey": "02aaa",
+                       "local_balance_pct": 10.0, "local_balance_sats": 200_000,
+                       "capacity_sats": 2_000_000, "estimated_rebalance_cost_sats": 1000}]
         engine, actions, _ = make_engine(base_config, {
             "mempool": {"fee_rate_sat_vbyte": 8},
             "lndg": {"imbalanced_channels": imbalanced, "routing_revenue_7d": {}},
@@ -172,7 +185,7 @@ class TestSafetyGuarantees:
     def test_engine_continues_after_monitor_failure(self, base_config):
         engine, _, _ = make_engine(base_config)
         engine.monitors["mempool"].collect.side_effect = Exception("API down")
-        engine.run_cycle()  # must not raise
+        engine.run_cycle()
 
     def test_engine_continues_after_action_failure(self, base_config):
         imbalanced = [{"chan_id": "111x1x0", "peer_alias": "TestPeer", "peer_pubkey": "02aaa",
@@ -182,4 +195,4 @@ class TestSafetyGuarantees:
             "lndg": {"imbalanced_channels": imbalanced, "routing_revenue_7d": {"111x1x0": 500}},
         })
         actions["rebalance"].execute.side_effect = Exception("LNDg API timeout")
-        engine.run_cycle()  # must not raise
+        engine.run_cycle()
