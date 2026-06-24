@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LND Agent Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0a0d12; --surface: #111520; --surface2: #161b27;
+    --border: #1e2535; --border2: #2a3347;
+    --text: #c8d4e8; --text2: #6b7a94; --text3: #3d4a5e;
+    --accent: #4fc3f7; --green: #43d17a; --amber: #f5a623;
+    --red: #f05252; --purple: #9b7fe8;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+  .logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-icon svg { width: 16px; height: 16px; color: #000; }
+  .logo-text { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: 0.05em; line-height: 1.2; }
+  .logo-sub { font-size: 10px; color: var(--text2); font-weight: 400; font-family: var(--sans); }
+  nav { padding: 12px 0; flex: 1; }
+  .nav-section { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: var(--text3); padding: 12px 20px 6px; text-transform: uppercase; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 20px; cursor: pointer; color: var(--text2); font-size: 13px; border-left: 2px solid transparent; transition: all 0.15s; }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,195,247,0.06); }
+  .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; background: var(--red); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; font-family: var(--mono); }
+  .status-bar { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); font-family: var(--mono); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { padding: 16px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
+  .topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .topbar-sub { font-size: 12px; color: var(--text2); margin-top: 1px; font-family: var(--mono); }
+  .topbar-actions { display: flex; gap: 10px; align-items: center; }
+  .btn { padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-family: var(--sans); transition: all 0.15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .btn-primary:hover { background: #7dd3fc; color: #000; }
+  .content { padding: 24px 28px; overflow-y: auto; flex: 1; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; position: relative; overflow: hidden; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .stat-card.green::before { background: var(--green); }
+  .stat-card.amber::before { background: var(--amber); }
+  .stat-card.red::before { background: var(--red); }
+  .stat-card.blue::before { background: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text2); font-weight: 500; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 600; font-family: var(--mono); color: var(--text); line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--text2); margin-top: 6px; font-family: var(--mono); }
+  .stat-change { font-size: 11px; margin-top: 6px; font-family: var(--mono); }
+  .stat-change.up { color: var(--green); }
+  .stat-change.down { color: var(--red); }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .panel-title svg { width: 14px; height: 14px; color: var(--text2); }
+  .panel-action { font-size: 11px; color: var(--accent); cursor: pointer; font-family: var(--mono); }
+  .log-feed { padding: 0; max-height: 280px; overflow-y: auto; }
+  .log-entry { padding: 9px 18px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; font-family: var(--mono); font-size: 12px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: var(--text3); flex-shrink: 0; width: 68px; }
+  .log-level { flex-shrink: 0; width: 52px; font-weight: 700; }
+  .log-level.INFO { color: var(--accent); }
+  .log-level.WARN { color: var(--amber); }
+  .log-level.AUTO { color: var(--green); }
+  .log-level.GATE { color: var(--purple); }
+  .log-msg { color: var(--text); flex: 1; }
+  .ch-table { width: 100%; border-collapse: collapse; }
+  .ch-table th { text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+  .ch-table td { padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .ch-table tr:last-child td { border-bottom: none; }
+  .ch-table tr:hover td { background: var(--surface2); }
+  .peer-name { font-weight: 500; color: var(--text); }
+  .peer-alias { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+  .bal-bar { width: 100px; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden; }
+  .bal-fill { height: 100%; border-radius: 3px; }
+  .bal-fill.ok { background: var(--green); }
+  .bal-fill.low { background: var(--amber); }
+  .bal-fill.critical { background: var(--red); }
+  .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; font-family: var(--mono); }
+  .tag.auto { background: rgba(67,209,122,0.12); color: var(--green); }
+  .tag.pending { background: rgba(155,127,232,0.12); color: var(--purple); }
+  .tag.idle { background: rgba(107,122,148,0.12); color: var(--text2); }
+  .tag.warn { background: rgba(245,166,35,0.12); color: var(--amber); }
+  .approval-card { margin: 14px 14px 0; padding: 14px; background: var(--surface2); border: 1px solid var(--border2); border-left: 3px solid var(--purple); border-radius: 6px; margin-bottom: 14px; }
+  .approval-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .approval-meta { font-size: 11px; color: var(--text2); font-family: var(--mono); margin-bottom: 10px; }
+  .approval-actions { display: flex; gap: 8px; }
+  .btn-approve { background: rgba(67,209,122,0.12); color: var(--green); border: 1px solid rgba(67,209,122,0.3); padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--mono); }
+  .btn-reject { background: rgba(240,82,82,0.1); color: var(--red); border: 1px solid rgba(240,82,82,0.25); padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--mono); }
+  .btn-snooze { background: transparent; color: var(--text2); border: 1px solid var(--border); padding: 5px 12px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: var(--mono); }
+  .mempool-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+  .mempool-row:last-child { border-bottom: none; }
+  .mempool-key { font-size: 12px; color: var(--text2); }
+  .mempool-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
+  .mempool-val.ok { color: var(--green); }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">LND AGENT</div>
+        <div class="logo-sub">v0.1.0 · dry-run</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-section">Monitor</div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Overview
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Channels
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Cycle Log
+      </div>
+      <div class="nav-section">Decisions</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        Approvals
+        <span class="nav-badge">1</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Rebalancing
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Fee Policy
+      </div>
+      <div class="nav-section">System</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Connections
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Safety
+      </div>
+    </nav>
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      Agent running
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Overview</div>
+        <div class="topbar-sub">Last cycle: 4 min ago · Next: 11 min · Cycle #47</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn">Force cycle</button>
+        <button class="btn">Pause agent</button>
+        <button class="btn btn-primary">Go live</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="stats-grid">
+        <div class="stat-card green">
+          <div class="stat-label">Routing revenue · 7d</div>
+          <div class="stat-value">4,821</div>
+          <div class="stat-sub">sats earned</div>
+          <div class="stat-change up">↑ 12% vs prior week</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Rebalance spend · 7d</div>
+          <div class="stat-value">312</div>
+          <div class="stat-sub">sats spent</div>
+          <div class="stat-change up">6.5% of revenue</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Active channels</div>
+          <div class="stat-value">14</div>
+          <div class="stat-sub">2 imbalanced · 0 zombie</div>
+          <div class="stat-change" style="color:var(--text2)">— no change</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Pending approvals</div>
+          <div class="stat-value">1</div>
+          <div class="stat-sub">channel close rec</div>
+          <div class="stat-change" style="color:var(--amber)">expires in 3h 22m</div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Channel health
+            </div>
+            <span class="panel-action">View all →</span>
+          </div>
+          <table class="ch-table">
+            <thead><tr><th>Peer</th><th>Balance</th><th>Local %</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="peer-name">ACINQ</div><div class="peer-alias">03864ef...</div></td>
+                <td><div class="bal-bar"><div class="bal-fill ok" style="width:62%"></div></div></td>
+                <td style="font-family:var(--mono);color:var(--green)">62%</td>
+                <td><span class="tag idle">idle</span></td>
+              </tr>
+              <tr>
+                <td><div class="peer-name">WalletOfSatoshi</div><div class="peer-alias">035e4ff...</div></td>
+                <td><div class="bal-bar"><div class="bal-fill low" style="width:18%"></div></div></td>
+                <td style="font-family:var(--mono);color:var(--amber)">18%</td>
+                <td><span class="tag auto">rebalancing</span></td>
+              </tr>
+              <tr>
+                <td><div class="peer-name">Bitfinex</div><div class="peer-alias">033d8a...</div></td>
+                <td><div class="bal-bar"><div class="bal-fill ok" style="width:51%"></div></div></td>
+                <td style="font-family:var(--mono);color:var(--green)">51%</td>
+                <td><span class="tag idle">idle</span></td>
+              </tr>
+              <tr>
+                <td><div class="peer-name">LNMarkets</div><div class="peer-alias">02df5a...</div></td>
+                <td><div class="bal-bar"><div class="bal-fill critical" style="width:6%"></div></div></td>
+                <td style="font-family:var(--mono);color:var(--red)">6%</td>
+                <td><span class="tag warn">loop queued</span></td>
+              </tr>
+              <tr>
+                <td><div class="peer-name">OldNode2021</div><div class="peer-alias">027b3c...</div></td>
+                <td><div class="bal-bar"><div class="bal-fill ok" style="width:44%"></div></div></td>
+                <td style="font-family:var(--mono);color:var(--text2)">44%</td>
+                <td><span class="tag pending">close rec</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+                Awaiting approval
+              </div>
+            </div>
+            <div class="approval-card">
+              <div class="approval-title">Close channel — OldNode2021</div>
+              <div class="approval-meta">45d zero routing · uptime 8% · capacity 1M sats<br>Expires in 3h 22m</div>
+              <div class="approval-actions">
+                <button class="btn-approve">APPROVE</button>
+                <button class="btn-reject">REJECT</button>
+                <button class="btn-snooze">snooze 7d</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Mempool
+              </div>
+            </div>
+            <div class="mempool-row"><span class="mempool-key">Economy fee</span><span class="mempool-val ok">8 sat/vbyte</span></div>
+            <div class="mempool-row"><span class="mempool-key">Fastest fee</span><span class="mempool-val">22 sat/vbyte</span></div>
+            <div class="mempool-row"><span class="mempool-key">Mempool size</span><span class="mempool-val ok">18 MB</span></div>
+            <div class="mempool-row"><span class="mempool-key">Congested</span><span class="mempool-val ok">No</span></div>
+            <div class="mempool-row"><span class="mempool-key">Fee mode</span><span class="mempool-val" style="color:var(--text2)">Normal (100 PPM)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Agent log · live
+          </div>
+          <span class="panel-action">Download full log</span>
+        </div>
+        <div class="log-feed">
+          <div class="log-entry"><span class="log-time">03:47:12</span><span class="log-level INFO">INFO</span><span class="log-msg">--- Cycle 47 started ---</span></div>
+          <div class="log-entry"><span class="log-time">03:47:12</span><span class="log-level INFO">INFO</span><span class="log-msg">Mempool: 8 sat/vbyte · size 18MB · not congested</span></div>
+          <div class="log-entry"><span class="log-time">03:47:13</span><span class="log-level INFO">INFO</span><span class="log-msg">LNDg: 14 channels · 2 imbalanced · 1 dead candidate</span></div>
+          <div class="log-entry"><span class="log-time">03:47:14</span><span class="log-level AUTO">AUTO</span><span class="log-msg">Rebalancing WalletOfSatoshi — local 18%, moving 410,000 sats</span></div>
+          <div class="log-entry"><span class="log-time">03:47:18</span><span class="log-level AUTO">AUTO</span><span class="log-msg">Fee policy unchanged — congestion normal, rate 100 PPM</span></div>
+          <div class="log-entry"><span class="log-time">03:47:19</span><span class="log-level WARN">WARN</span><span class="log-msg">LNMarkets local balance 6% — rebalancing failed 3x, queuing Loop In</span></div>
+          <div class="log-entry"><span class="log-time">03:47:21</span><span class="log-level INFO">INFO</span><span class="log-msg">Loop In queued: 600,000 sats · max fee 0.5% · pending approval</span></div>
+          <div class="log-entry"><span class="log-time">03:47:22</span><span class="log-level GATE">GATE</span><span class="log-msg">Approval sent → Alby: close OldNode2021 (45d idle, 8% uptime)</span></div>
+          <div class="log-entry"><span class="log-time">03:47:22</span><span class="log-level INFO">INFO</span><span class="log-msg">--- Cycle 47 complete in 10.3s · next in 890s ---</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
