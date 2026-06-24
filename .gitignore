@@ -1,0 +1,11 @@
+config/config.yml
+agent/logs/
+*.log
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+*.macaroon
+tls.cert
