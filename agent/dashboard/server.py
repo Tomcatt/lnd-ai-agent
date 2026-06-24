@@ -19,9 +19,12 @@ from flask import Flask, jsonify, send_from_directory, request
 log = logging.getLogger("dashboard")
 app = Flask(__name__, static_folder="static")
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
+
 
 def load_config():
-    path = Path("config/config.yml")
+    path = Path(_REPO_ROOT) / "config" / "config.yml"
     if not path.exists():
         raise FileNotFoundError("config/config.yml not found")
     with open(path) as f:
@@ -30,7 +33,7 @@ def load_config():
 
 @app.route("/")
 def index():
-    return send_from_directory("agent/dashboard", "index.html")
+    return send_from_directory(_HERE, "index.html")
 
 
 @app.route("/api/mempool")
@@ -136,7 +139,7 @@ def api_stats():
 @app.route("/api/log")
 def api_log():
     n = int(request.args.get("lines", 50))
-    log_dir = Path("agent/logs")
+    log_dir = Path(_REPO_ROOT) / "agent" / "logs"
     try:
         today = datetime.utcnow().strftime("%Y%m%d")
         log_file = log_dir / f"agent_{today}.log"
@@ -193,7 +196,7 @@ def api_agent_status():
 
 @app.route("/api/approvals")
 def api_approvals():
-    approvals_file = Path("agent/logs/pending_approvals.json")
+    approvals_file = Path(_REPO_ROOT) / "agent" / "logs" / "pending_approvals.json"
     try:
         if approvals_file.exists():
             with open(approvals_file) as f:
@@ -209,7 +212,7 @@ def api_approval_response(request_id):
     outcome = request.json.get("outcome")
     if outcome not in ("APPROVE", "REJECT", "SNOOZE_7_DAYS"):
         return jsonify({"error": "Invalid outcome"}), 400
-    responses_file = Path("agent/logs/approval_responses.json")
+    responses_file = Path(_REPO_ROOT) / "agent" / "logs" / "approval_responses.json"
     try:
         existing = {}
         if responses_file.exists():
