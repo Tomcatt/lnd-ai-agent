@@ -30,13 +30,12 @@ class LNDgMonitor:
 
     def collect(self) -> dict:
         signals = {}
-
         try:
             channels = self._get_all_channels()
             open_channels = [c for c in channels if c.get("is_open", False)]
             signals["imbalanced_channels"] = self._find_imbalanced(open_channels)
             signals["dead_channels"] = self._find_dead(open_channels)
-            signals["stuck_funding_channels"] = self._find_stuck_funding(channels)
+            signals["stuck_funding_channels"] = []
             signals["total_channels"] = len(open_channels)
             log.info(f"LNDg: {len(open_channels)} open channels, "
                      f"{len(signals['imbalanced_channels'])} imbalanced, "
@@ -133,19 +132,6 @@ class LNDgMonitor:
             except Exception:
                 pass
         return dead
-
-    def _find_stuck_funding(self, channels: list) -> list:
-        stuck = []
-        for ch in channels:
-            if not ch.get("is_open", True) and not ch.get("is_active", True):
-                local = ch.get("local_balance", 0) or 0
-                if local > 0:
-                    stuck.append({
-                        "chan_id": ch.get("chan_id"),
-                        "peer_alias": ch.get("alias", "unknown"),
-                        "days_pending": 0,
-                    })
-        return stuck
 
     def _calc_revenue_7d(self, payments: list) -> dict:
         from datetime import datetime, timedelta

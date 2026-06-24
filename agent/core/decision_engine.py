@@ -14,8 +14,8 @@ log = logging.getLogger("decision_engine")
 @dataclass
 class Decision:
     rule: str
-    priority: str          # critical / high / medium / low
-    action_type: str       # autonomous / approval_required / instruct_human
+    priority: str
+    action_type: str
     summary: str
     data: dict = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
@@ -27,24 +27,16 @@ class DecisionEngine:
         self.monitors = monitors
         self.actions = actions
         self.approval_gate = approval_gate
-        self.cfg = config  # shorthand
-
-        # Track consecutive rebalance failures per channel
+        self.cfg = config
         self._rebalance_failures: dict = {}
 
     def run_cycle(self):
         log.info("Collecting signals from all monitors...")
         signals = self._collect_signals()
-
         log.info("Running decision rules...")
         decisions = self._evaluate_rules(signals)
-
         log.info(f"{len(decisions)} decisions produced. Processing...")
         self._process_decisions(decisions)
-
-    # ─────────────────────────────────────────
-    # Signal collection
-    # ─────────────────────────────────────────
 
     def _collect_signals(self) -> dict:
         signals = {}
@@ -57,11 +49,7 @@ class DecisionEngine:
                 signals[name] = {}
         return signals
 
-    # ─────────────────────────────────────────
-    # Rule evaluation
-    # ─────────────────────────────────────────
-
-    def _evaluate_rules(self, signals: dict) -> list[Decision]:
+    def _evaluate_rules(self, signals: dict) -> list:
         decisions = []
         rules = [
             self._rule_scb_freshness,
@@ -84,10 +72,6 @@ class DecisionEngine:
                 log.error(f"Rule [{rule.__name__}] raised exception: {e}", exc_info=True)
         return decisions
 
-    # ─────────────────────────────────────────
-    # Rules
-    # ─────────────────────────────────────────
-
     def _rule_scb_freshness(self, signals: dict) -> Optional[Decision]:
         scb_age = signals.get("thunderhub", {}).get("scb_age_hours", 0)
         max_age = self.cfg["safety"]["scb_max_age_hours"]
@@ -96,14 +80,13 @@ class DecisionEngine:
                 rule="scb_freshness",
                 priority="critical",
                 action_type="approval_required",
-                summary=f"Static Channel Backup is {scb_age:.1f} hours old (max: {max_age}h). Immediate attention required.",
+                summary=f"SCB is {scb_age:.1f}h old (max: {max_age}h). Immediate attention required.",
                 data={"scb_age_hours": scb_age},
             )
         return None
 
     def _rule_db_corruption(self, signals: dict) -> Optional[Decision]:
-        corruption_detected = signals.get("lndg", {}).get("db_corruption_warning", False)
-        if corruption_detected:
+        if signals.get("lndg", {}).get("db_corruption_warning", False):
             return Decision(
                 rule="db_corruption",
                 priority="critical",
@@ -121,7 +104,7 @@ class DecisionEngine:
             )
         return None
 
-    def _rule_stuck_funding(self, signals: dict) -> Optional[Decision]:
+    def _rule_stuck_funding(self, signals: dict) -> Optional[list]:
         stuck = signals.get("lndg", {}).get("stuck_funding_channels", [])
         decisions = []
         for ch in stuck:
@@ -134,7 +117,7 @@ class DecisionEngine:
             ))
         return decisions if decisions else None
 
-    def _rule_zombie_channels(self, signals: dict) -> Optional[Decision]:
+    def _rule_zombie_channels(self, signals: dict) -> Optional[list]:
         zombie_days = self.cfg["channel_health"]["zombie_routing_days"]
         uptime_thresh = self.cfg["channel_health"]["close_uptime_threshold_pct"]
         dead = signals.get("lndg", {}).get("dead_channels", [])
@@ -153,7 +136,7 @@ class DecisionEngine:
                 ))
         return decisions if decisions else None
 
-    def _rule_rebalancing(self, signals: dict) -> Optional[Decision]:
+    def _rule_rebalancing(self, signals: dict) -> Optional[list]:
         fee_rate = signals.get("mempool", {}).get("fee_rate_sat_vbyte", 999)
         max_fee = self.cfg["rebalancing"]["max_fee_rate_sat_vbyte"]
         if fee_rate > max_fee:
@@ -162,23 +145,35 @@ class DecisionEngine:
 
         imbalanced = signals.get("lndg", {}).get("imbalanced_channels", [])
         revenue = signals.get("lndg", {}).get("routing_revenue_7d", {})
-        rebal_cost = signals.get("lndg", {}).get("rebalance_cost_7d", {})
         ratio_max = self.cfg["rebalancing"]["cost_revenue_ratio_max"]
+        new_channel_cap = 500  # max sats to spend rebalancing a channel with no revenue history
+
+        log.info(f"Rebalancing: {len(imbalanced)} imbalanced channels, "
+                 f"revenue on {len(revenue)} channels")
 
         decisions = []
         for ch in imbalanced:
-            ch_id = ch.get("chan_id")
+            ch_id = str(ch.get("chan_id", ""))
             ch_revenue = revenue.get(ch_id, 0)
-            ch_cost = rebal_cost.get(ch_id, 0)
+            projected_cost = ch.get("estimated_rebalance_cost_sats", 0)
+
+            log.info(f"Rebalance check {ch.get('peer_alias')}: "
+                     f"local {ch.get('local_balance_pct')}%, "
+                     f"7d revenue {ch_revenue:.1f} sats, "
+                     f"est cost {projected_cost} sats")
 
             if ch_revenue == 0:
-                log.debug(f"Skipping rebalance for {ch.get('peer_alias')} — zero revenue this week")
-                continue
-
-            projected_cost = ch.get("estimated_rebalance_cost_sats", 0)
-            if projected_cost > ch_revenue * ratio_max:
-                log.info(f"Rebalancing {ch.get('peer_alias')} uneconomic — cost {projected_cost} > {ratio_max * 100:.0f}% of revenue {ch_revenue}")
-                continue
+                if projected_cost > new_channel_cap:
+                    log.info(f"Skipping {ch.get('peer_alias')} — no revenue, "
+                             f"cost {projected_cost} > {new_channel_cap} sat new-channel cap")
+                    continue
+                log.info(f"Rebalancing {ch.get('peer_alias')} — new channel, "
+                         f"cost {projected_cost} sats within {new_channel_cap} sat cap")
+            else:
+                if projected_cost > ch_revenue * ratio_max:
+                    log.info(f"Skipping {ch.get('peer_alias')} — uneconomic, "
+                             f"cost {projected_cost} > {ratio_max*100:.0f}% of {ch_revenue:.1f} revenue")
+                    continue
 
             decisions.append(Decision(
                 rule="rebalancing",
@@ -189,21 +184,20 @@ class DecisionEngine:
             ))
         return decisions if decisions else None
 
-    def _rule_fee_policy(self, signals: dict) -> Optional[Decision]:
+    def _rule_fee_policy(self, signals: dict) -> Decision:
         congested = signals.get("mempool", {}).get("mempool_congested", False)
         bump = self.cfg["fees"]["congestion_fee_bump_ppm"]
         base_ppm = self.cfg["fees"]["base_fee_rate_ppm"]
-
         target_ppm = base_ppm + bump if congested else base_ppm
         return Decision(
             rule="fee_policy",
             priority="low",
             action_type="autonomous",
-            summary=f"Set fee rate to {target_ppm} PPM ({'congestion mode' if congested else 'normal mode'})",
+            summary=f"Set fee rate to {target_ppm} PPM ({'congestion' if congested else 'normal'} mode)",
             data={"target_ppm": target_ppm, "congested": congested},
         )
 
-    def _rule_loop_swap(self, signals: dict) -> Optional[Decision]:
+    def _rule_loop_swap(self, signals: dict) -> Optional[list]:
         fee_rate = signals.get("mempool", {}).get("fee_rate_sat_vbyte", 999)
         max_fee = self.cfg["loop"]["max_fee_rate_sat_vbyte"]
         if fee_rate > max_fee:
@@ -224,19 +218,14 @@ class DecisionEngine:
                     rule="loop_swap",
                     priority="medium",
                     action_type="autonomous",
-                    summary=f"Loop In for {ch.get('peer_alias')} — rebalancing failed {failures}x, local balance {ch.get('local_balance_pct'):.0f}%",
+                    summary=f"Loop In for {ch.get('peer_alias')} — rebalancing failed {failures}x, local {ch.get('local_balance_pct'):.0f}%",
                     data=ch,
                 ))
         return decisions if decisions else None
 
-    # ─────────────────────────────────────────
-    # Decision processing
-    # ─────────────────────────────────────────
-
-    def _process_decisions(self, decisions: list[Decision]):
+    def _process_decisions(self, decisions: list):
         for decision in decisions:
             log.info(f"[{decision.priority.upper()}] {decision.rule}: {decision.summary}")
-
             if decision.action_type == "autonomous":
                 self._execute_autonomous(decision)
             elif decision.action_type == "approval_required":
@@ -258,10 +247,10 @@ class DecisionEngine:
             except Exception as e:
                 log.error(f"Autonomous action [{decision.rule}] failed: {e}")
         else:
-            log.warning(f"No action handler for autonomous rule: {decision.rule}")
+            log.warning(f"No action handler for rule: {decision.rule}")
 
     def _send_for_approval(self, decision: Decision):
-        log.info(f"Sending approval request to Alby Hub: {decision.summary}")
+        log.info(f"Sending approval request: {decision.summary}")
         try:
             self.approval_gate.send_request(decision)
         except Exception as e:
