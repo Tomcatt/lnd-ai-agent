@@ -1,40 +1,58 @@
 """
 Faraday Monitor — queries Faraday via Lightning Terminal REST proxy.
+Gracefully skips if Lightning Terminal is unreachable or macaroon missing.
 """
-
 import logging
 import requests
 
 log = logging.getLogger("monitor.faraday")
 
+MACAROON_PATHS = [
+    "/home/umbrel/umbrel/app-data/lightning/data/lnd/data/chain/bitcoin/mainnet/admin.macaroon",
+    "/home/umbrel/umbrel/app-data/lightning/data/lnd/admin.macaroon",
+    "/root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon",
+]
 
 class FaradayMonitor:
     def __init__(self, config: dict):
         self.base_url = config["endpoints"]["lightning_terminal"]
-        self.macaroon_path = config["credentials"]["lit_macaroon_path"]
-        self._macaroon_hex = self._load_macaroon()
+        configured = config["credentials"].get("lit_macaroon_path", "")
+        self._macaroon_hex = self._load_macaroon(configured)
 
     def collect(self) -> dict:
-        signals = {}
+        signals = {
+            "channel_revenue_per_sat": {},
+            "underperforming_channels": [],
+            "faraday_close_recommendations": [],
+        }
+        if not self._macaroon_hex:
+            log.warning("Faraday: no macaroon loaded — skipping this cycle")
+            return signals
         try:
             report = self._get_channel_insights()
             signals["channel_revenue_per_sat"] = report.get("revenue_per_sat", {})
             signals["underperforming_channels"] = report.get("underperforming", [])
             signals["faraday_close_recommendations"] = report.get("close_recommendations", [])
         except Exception as e:
-            log.warning(f"Faraday query failed: {e}. Skipping this cycle.")
-            signals["channel_revenue_per_sat"] = {}
-            signals["underperforming_channels"] = []
-            signals["faraday_close_recommendations"] = []
+            log.warning(f"Faraday query failed: {e} — skipping this cycle")
         return signals
 
-    def _load_macaroon(self) -> str:
-        try:
-            with open(self.macaroon_path, "rb") as f:
-                return f.read().hex()
-        except Exception as e:
-            log.warning(f"Could not load macaroon: {e}")
-            return ""
+    def _load_macaroon(self, configured_path: str) -> str:
+        paths = [configured_path] + MACAROON_PATHS if configured_path else MACAROON_PATHS
+        for path in paths:
+            if not path:
+                continue
+            try:
+                with open(path, "rb") as f:
+                    log.info(f"Faraday: loaded macaroon from {path}")
+                    return f.read().hex()
+            except FileNotFoundError:
+                continue
+            except PermissionError:
+                log.warning(f"Faraday: permission denied reading {path}")
+                continue
+        log.warning("Faraday: could not load macaroon from any known path")
+        return ""
 
     def _get_channel_insights(self) -> dict:
         headers = {"Grpc-Metadata-macaroon": self._macaroon_hex}

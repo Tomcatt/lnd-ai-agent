@@ -40,6 +40,6 @@ class MempoolMonitor:
         return r.json()
 
     def _get_mempool(self) -> dict:
-        r = requests.get(f"{self.base_url}/api/mempool", timeout=10)
+        r = requests.get(f"{self.base_url}/api/v1/mempool", timeout=10)
         r.raise_for_status()
         return r.json()
