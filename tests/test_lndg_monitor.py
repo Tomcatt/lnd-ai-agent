@@ -1,5 +1,6 @@
 """
 Tests for LNDgMonitor.
+Field names updated to match real LNDg API responses confirmed on Umbrel.
 """
 
 import pytest
@@ -28,9 +29,10 @@ class TestLNDgImbalanceDetection:
         monitor = make_monitor(base_config)
         channel = {
             "chan_id": "444x1x0", "alias": "FullPeer", "remote_pubkey": "02ddd",
-            "capacity": 2_000_000, "local_balance": 1_900_000,
-            "is_active": True, "open_date": "2024-01-01T00:00:00Z",
-            "last_forward": "2025-01-01T00:00:00Z",
+            "capacity": 2_000_000, "local_balance": 1_900_000, "remote_balance": 100_000,
+            "is_active": True, "is_open": True,
+            "total_sent": 100, "total_received": 0,
+            "fees_updated": "2025-01-01T00:00:00",
         }
         result = monitor._find_imbalanced([channel])
         assert len(result) == 1
@@ -40,9 +42,10 @@ class TestLNDgImbalanceDetection:
         monitor = make_monitor(base_config)
         channel = {
             "chan_id": "555x1x0", "alias": "BoundaryPeer", "remote_pubkey": "02eee",
-            "capacity": 1_000_000, "local_balance": 200_000,
-            "is_active": True, "open_date": "2024-01-01T00:00:00Z",
-            "last_forward": "2025-01-01T00:00:00Z",
+            "capacity": 1_000_000, "local_balance": 200_000, "remote_balance": 800_000,
+            "is_active": True, "is_open": True,
+            "total_sent": 0, "total_received": 0,
+            "fees_updated": "2025-01-01T00:00:00",
         }
         assert monitor._find_imbalanced([channel]) == []
 
@@ -66,12 +69,14 @@ class TestLNDgZombieDetection:
 
     def test_new_never_forwarded_channel_not_flagged(self, base_config):
         from datetime import datetime, timedelta
-        recent_date = (datetime.utcnow() - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        recent_date = (datetime.utcnow() - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%S")
         monitor = make_monitor(base_config)
         channel = {
             "chan_id": "666x1x0", "alias": "NewPeer", "remote_pubkey": "02fff",
-            "capacity": 1_000_000, "local_balance": 500_000,
-            "is_active": True, "open_date": recent_date, "last_forward": None,
+            "capacity": 1_000_000, "local_balance": 500_000, "remote_balance": 500_000,
+            "is_active": True, "is_open": True,
+            "total_sent": 0, "total_received": 0,
+            "fees_updated": recent_date,
         }
         assert monitor._find_dead([channel]) == []
 
@@ -81,16 +86,39 @@ class TestLNDgRevenue:
     def test_revenue_calculated_correctly(self, base_config):
         from datetime import datetime, timedelta
         monitor = make_monitor(base_config)
-        recent = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        old = (datetime.utcnow() - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        recent = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        old = (datetime.utcnow() - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%S")
         payments = [
-            {"is_routing": True, "fee_sat": 100, "chan_id_out": "111x1x0", "created_at": recent},
-            {"is_routing": True, "fee_sat": 50,  "chan_id_out": "111x1x0", "created_at": recent},
-            {"is_routing": True, "fee_sat": 200, "chan_id_out": "111x1x0", "created_at": old},
-            {"is_routing": False, "fee_sat": 999, "chan_id_out": "111x1x0", "created_at": recent},
+            {"rebal_chan": None, "fee": 100.0, "chan_out": "111x1x0", "creation_date": recent, "status": 2},
+            {"rebal_chan": None, "fee": 50.0,  "chan_out": "111x1x0", "creation_date": recent, "status": 2},
+            {"rebal_chan": None, "fee": 200.0, "chan_out": "111x1x0", "creation_date": old,    "status": 2},
+            {"rebal_chan": "222x1x0", "fee": 999.0, "chan_out": "111x1x0", "creation_date": recent, "status": 2},
         ]
         revenue = monitor._calc_revenue_7d(payments)
-        assert revenue.get("111x1x0") == 150
+        assert revenue.get("111x1x0") == 150.0
+
+    def test_rebalance_cost_calculated_correctly(self, base_config):
+        from datetime import datetime, timedelta
+        monitor = make_monitor(base_config)
+        recent = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        payments = [
+            {"rebal_chan": "111x1x0", "fee": 25.0, "chan_out": "999x1x0", "creation_date": recent, "status": 2},
+            {"rebal_chan": "111x1x0", "fee": 15.0, "chan_out": "999x1x0", "creation_date": recent, "status": 2},
+            {"rebal_chan": None,       "fee": 100.0, "chan_out": "111x1x0", "creation_date": recent, "status": 2},
+        ]
+        costs = monitor._calc_rebalance_cost_7d(payments)
+        assert costs.get("111x1x0") == 40.0
+
+    def test_incomplete_payments_not_counted(self, base_config):
+        from datetime import datetime, timedelta
+        monitor = make_monitor(base_config)
+        recent = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        payments = [
+            {"rebal_chan": None, "fee": 100.0, "chan_out": "111x1x0", "creation_date": recent, "status": 1},
+            {"rebal_chan": None, "fee": 100.0, "chan_out": "111x1x0", "creation_date": recent, "status": 3},
+        ]
+        revenue = monitor._calc_revenue_7d(payments)
+        assert revenue.get("111x1x0") is None
 
     def test_empty_payments_returns_empty_dict(self, base_config):
         monitor = make_monitor(base_config)
@@ -110,7 +138,7 @@ class TestLNDgAPIFailure:
     def test_payment_api_failure_returns_empty_dicts(self, base_config):
         monitor = make_monitor(base_config)
         channel_response = MagicMock(status_code=200)
-        channel_response.json.return_value = {"results": []}
+        channel_response.json.return_value = {"results": [], "next": None}
         with patch("agent.monitors.lndg.requests.get") as mock_get:
             mock_get.side_effect = [channel_response, Exception("payment API down")]
             signals = monitor.collect()
