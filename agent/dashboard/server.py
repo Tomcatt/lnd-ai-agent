@@ -42,7 +42,7 @@ def api_mempool():
     base = config["endpoints"]["mempool_api"]
     try:
         fees = requests.get(f"{base}/api/v1/fees/recommended", timeout=5).json()
-        mempool = requests.get(f"{base}/api/mempool", timeout=5).json()
+        mempool = requests.get(f"{base}/api/v1/mempool", timeout=5).json()
         size_mb = round(mempool.get("vsize", 0) / 1_000_000, 2)
         congested = size_mb > config["fees"]["congestion_threshold_mb"]
         return jsonify({
