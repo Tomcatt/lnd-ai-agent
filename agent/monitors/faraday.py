@@ -8,6 +8,8 @@ import requests
 log = logging.getLogger("monitor.faraday")
 
 MACAROON_PATHS = [
+    "/home/umbrel/umbrel/app-data/lightning-terminal/data/.faraday/mainnet/faraday.macaroon",
+    "/home/umbrel/umbrel/app-data/lightning-terminal/data/.lit/mainnet/lit.macaroon",
     "/home/umbrel/umbrel/app-data/lightning/data/lnd/data/chain/bitcoin/mainnet/admin.macaroon",
     "/home/umbrel/umbrel/app-data/lightning/data/lnd/admin.macaroon",
     "/root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon",
