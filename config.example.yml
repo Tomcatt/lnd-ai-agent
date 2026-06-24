@@ -1,0 +1,120 @@
+# LND AI Agent Configuration
+# Copy this file to config.yml and fill in your values
+# All Umbrel container hostnames are pre-filled — only change if your setup differs
+
+# ─────────────────────────────────────────
+# Agent behaviour
+# ─────────────────────────────────────────
+agent:
+  cycle_interval_minutes: 15
+  log_level: INFO                  # DEBUG / INFO / WARNING / ERROR
+  dry_run: true                    # Set false when ready to go live
+
+# ─────────────────────────────────────────
+# Umbrel container endpoints
+# These match your docker ps output — do not change unless customised
+# ─────────────────────────────────────────
+endpoints:
+  lnd_grpc: "lightning_lnd_1:10009"
+  lndg_api: "http://lndg_web_1:8889"
+  thunderhub_graphql: "http://thunderhub_web_1:3000/graphql"
+  lnbits_api: "http://lnbits_web_1:5000"
+  albyhub_api: "http://albyhub_server_1:8080"
+  mempool_api: "http://mempool_api_1:8999"
+  lightning_terminal: "https://lightning-terminal_web_1:8443"
+
+# ─────────────────────────────────────────
+# API credentials (fill these in)
+# ─────────────────────────────────────────
+credentials:
+  lndg_user: "your_lndg_username"
+  lndg_pass: "your_lndg_password"
+  thunderhub_token: "your_thunderhub_api_token"
+  lnbits_agent_wallet_key: "your_lnbits_agent_wallet_invoice_key"
+  lnbits_agent_admin_key: "your_lnbits_agent_wallet_admin_key"
+  albyhub_token: "your_albyhub_api_token"
+  lit_macaroon_path: "/root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+  lnd_tls_cert_path: "/root/.lnd/tls.cert"
+
+# ─────────────────────────────────────────
+# Rebalancing thresholds
+# ─────────────────────────────────────────
+rebalancing:
+  # Channel is considered imbalanced outside this range
+  min_local_balance_pct: 20
+  max_local_balance_pct: 80
+
+  # Only rebalance if mempool fee is at or below this
+  max_fee_rate_sat_vbyte: 20
+
+  # Rebalancing cost must be below this fraction of 7-day routing revenue
+  # 0.5 = rebalance cost must be less than 50% of what channel earned last week
+  cost_revenue_ratio_max: 0.5
+
+  # Consecutive failed rebalance cycles before triggering Loop swap
+  loop_fallback_after_failures: 3
+
+# ─────────────────────────────────────────
+# Fee policy
+# ─────────────────────────────────────────
+fees:
+  # Base fee in millisatoshis
+  base_fee_msat: 1000
+
+  # Base fee rate in PPM (parts per million)
+  base_fee_rate_ppm: 100
+
+  # Extra PPM added when mempool is congested
+  congestion_fee_bump_ppm: 50
+
+  # Mempool is "congested" above this size in MB
+  congestion_threshold_mb: 50
+
+# ─────────────────────────────────────────
+# Loop (submarine swaps)
+# ─────────────────────────────────────────
+loop:
+  # Only trigger Loop if mempool fee is at or below this
+  max_fee_rate_sat_vbyte: 15
+
+  # Minimum local balance % before considering Loop In
+  trigger_below_local_pct: 10
+
+# ─────────────────────────────────────────
+# Human approval gate
+# ─────────────────────────────────────────
+approval:
+  # Hours before a channel open/close request expires (default: do nothing)
+  channel_action_timeout_hours: 4
+
+  # Minutes before a payment approval expires (default: reject)
+  payment_timeout_minutes: 15
+
+  # Payments above this require human approval
+  payment_approval_threshold_sats: 100000
+
+# ─────────────────────────────────────────
+# Channel health
+# ─────────────────────────────────────────
+channel_health:
+  # Days with zero routing before a channel is flagged as potentially dead
+  zombie_routing_days: 30
+
+  # Peer uptime % below which close is considered
+  close_uptime_threshold_pct: 20
+
+  # HTLC failures per week that trigger peer reliability flag
+  htlc_failure_weekly_threshold: 3
+
+# ─────────────────────────────────────────
+# Safety
+# ─────────────────────────────────────────
+safety:
+  # LNbits agent wallet daily spending cap in sats
+  daily_spending_cap_sats: 50000
+
+  # SCB age in hours before freshness alert fires
+  scb_max_age_hours: 24
+
+  # Number of cycles to wait after a failed action before retrying
+  retry_cooldown_cycles: 4
