@@ -6,104 +6,104 @@
 <title>LND Agent Dashboard</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap');
-  :root {
-    --bg: #0a0d12; --surface: #111520; --surface2: #161b27;
-    --border: #1e2535; --border2: #2a3347;
-    --text: #c8d4e8; --text2: #6b7a94; --text3: #3d4a5e;
-    --accent: #4fc3f7; --green: #43d17a; --amber: #f5a623;
-    --red: #f05252; --purple: #9b7fe8;
-    --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; min-height: 100vh; }
-  .shell { display: flex; min-height: 100vh; }
-  .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
-  .logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .logo-icon svg { width: 16px; height: 16px; color: #000; }
-  .logo-text { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: 0.05em; line-height: 1.2; }
-  .logo-sub { font-size: 10px; color: var(--text2); font-weight: 400; font-family: var(--sans); }
-  nav { padding: 12px 0; flex: 1; }
-  .nav-section { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: var(--text3); padding: 12px 20px 6px; text-transform: uppercase; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 20px; cursor: pointer; color: var(--text2); font-size: 13px; border-left: 2px solid transparent; transition: all 0.15s; }
-  .nav-item:hover { color: var(--text); background: var(--surface2); }
-  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,195,247,0.06); }
-  .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
-  .nav-badge { margin-left: auto; background: var(--red); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; font-family: var(--mono); }
-  .status-bar { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); font-family: var(--mono); }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .topbar { padding: 16px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
-  .topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
-  .topbar-sub { font-size: 12px; color: var(--text2); margin-top: 1px; font-family: var(--mono); }
-  .topbar-actions { display: flex; gap: 10px; align-items: center; }
-  .btn { padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-family: var(--sans); transition: all 0.15s; }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
-  .btn-primary:hover { background: #7dd3fc; color: #000; }
-  .content { padding: 24px 28px; overflow-y: auto; flex: 1; }
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; position: relative; overflow: hidden; }
-  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
-  .stat-card.green::before { background: var(--green); }
-  .stat-card.amber::before { background: var(--amber); }
-  .stat-card.red::before { background: var(--red); }
-  .stat-card.blue::before { background: var(--accent); }
-  .stat-label { font-size: 11px; color: var(--text2); font-weight: 500; letter-spacing: 0.04em; margin-bottom: 8px; }
-  .stat-value { font-size: 26px; font-weight: 600; font-family: var(--mono); color: var(--text); line-height: 1; }
-  .stat-sub { font-size: 11px; color: var(--text2); margin-top: 6px; font-family: var(--mono); }
-  .stat-change { font-size: 11px; margin-top: 6px; font-family: var(--mono); }
-  .stat-change.up { color: var(--green); }
-  .stat-change.down { color: var(--red); }
-  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px; }
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .panel-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
-  .panel-title svg { width: 14px; height: 14px; color: var(--text2); }
-  .panel-action { font-size: 11px; color: var(--accent); cursor: pointer; font-family: var(--mono); }
-  .log-feed { padding: 0; max-height: 280px; overflow-y: auto; }
-  .log-entry { padding: 9px 18px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; font-family: var(--mono); font-size: 12px; }
-  .log-entry:last-child { border-bottom: none; }
-  .log-time { color: var(--text3); flex-shrink: 0; width: 68px; }
-  .log-level { flex-shrink: 0; width: 52px; font-weight: 700; }
-  .log-level.INFO { color: var(--accent); }
-  .log-level.WARN { color: var(--amber); }
-  .log-level.AUTO { color: var(--green); }
-  .log-level.GATE { color: var(--purple); }
-  .log-msg { color: var(--text); flex: 1; }
-  .ch-table { width: 100%; border-collapse: collapse; }
-  .ch-table th { text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; padding: 10px 18px; border-bottom: 1px solid var(--border); }
-  .ch-table td { padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 12px; }
-  .ch-table tr:last-child td { border-bottom: none; }
-  .ch-table tr:hover td { background: var(--surface2); }
-  .peer-name { font-weight: 500; color: var(--text); }
-  .peer-alias { font-size: 11px; color: var(--text2); font-family: var(--mono); }
-  .bal-bar { width: 100px; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden; }
-  .bal-fill { height: 100%; border-radius: 3px; }
-  .bal-fill.ok { background: var(--green); }
-  .bal-fill.low { background: var(--amber); }
-  .bal-fill.critical { background: var(--red); }
-  .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; font-family: var(--mono); }
-  .tag.auto { background: rgba(67,209,122,0.12); color: var(--green); }
-  .tag.pending { background: rgba(155,127,232,0.12); color: var(--purple); }
-  .tag.idle { background: rgba(107,122,148,0.12); color: var(--text2); }
-  .tag.warn { background: rgba(245,166,35,0.12); color: var(--amber); }
-  .approval-card { margin: 14px 14px 0; padding: 14px; background: var(--surface2); border: 1px solid var(--border2); border-left: 3px solid var(--purple); border-radius: 6px; margin-bottom: 14px; }
-  .approval-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-  .approval-meta { font-size: 11px; color: var(--text2); font-family: var(--mono); margin-bottom: 10px; }
-  .approval-actions { display: flex; gap: 8px; }
-  .btn-approve { background: rgba(67,209,122,0.12); color: var(--green); border: 1px solid rgba(67,209,122,0.3); padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--mono); }
-  .btn-reject { background: rgba(240,82,82,0.1); color: var(--red); border: 1px solid rgba(240,82,82,0.25); padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--mono); }
-  .btn-snooze { background: transparent; color: var(--text2); border: 1px solid var(--border); padding: 5px 12px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: var(--mono); }
-  .mempool-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--border); }
-  .mempool-row:last-child { border-bottom: none; }
-  .mempool-key { font-size: 12px; color: var(--text2); }
-  .mempool-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
-  .mempool-val.ok { color: var(--green); }
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  :root{--bg:#0a0d12;--surface:#111520;--surface2:#161b27;--border:#1e2535;--border2:#2a3347;--text:#c8d4e8;--text2:#6b7a94;--text3:#3d4a5e;--accent:#4fc3f7;--green:#43d17a;--amber:#f5a623;--red:#f05252;--purple:#9b7fe8;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;min-height:100vh;}
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
+  .logo{padding:20px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .logo-icon svg{width:16px;height:16px;color:#000;}
+  .logo-text{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);letter-spacing:.05em;line-height:1.2;}
+  .logo-sub{font-size:10px;color:var(--text2);font-weight:400;font-family:var(--sans);}
+  nav{padding:12px 0;flex:1;}
+  .nav-section{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);padding:12px 20px 6px;text-transform:uppercase;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:8px 20px;cursor:pointer;color:var(--text2);font-size:13px;border-left:2px solid transparent;transition:all .15s;}
+  .nav-item:hover{color:var(--text);background:var(--surface2);}
+  .nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,195,247,.06);}
+  .nav-item svg{width:15px;height:15px;flex-shrink:0;}
+  .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;font-family:var(--mono);}
+  .status-bar{padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);font-family:var(--mono);}
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 2s ease-in-out infinite;}
+  .status-dot.offline{background:var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  .topbar{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);}
+  .topbar-title{font-size:16px;font-weight:600;color:var(--text);}
+  .topbar-sub{font-size:12px;color:var(--text2);margin-top:1px;font-family:var(--mono);}
+  .topbar-actions{display:flex;gap:10px;align-items:center;}
+  .btn{padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:var(--sans);transition:all .15s;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;}
+  .btn-primary:hover{background:#7dd3fc;color:#000;}
+  .btn-live{background:rgba(67,209,122,.15);color:var(--green);border-color:rgba(67,209,122,.4);}
+  .content{padding:24px 28px;overflow-y:auto;flex:1;}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;position:relative;overflow:hidden;}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .stat-card.green::before{background:var(--green);}
+  .stat-card.amber::before{background:var(--amber);}
+  .stat-card.red::before{background:var(--red);}
+  .stat-card.blue::before{background:var(--accent);}
+  .stat-label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:.04em;margin-bottom:8px;}
+  .stat-value{font-size:26px;font-weight:600;font-family:var(--mono);color:var(--text);line-height:1;}
+  .stat-sub{font-size:11px;color:var(--text2);margin-top:6px;font-family:var(--mono);}
+  .stat-change{font-size:11px;margin-top:6px;font-family:var(--mono);}
+  .stat-change.up{color:var(--green);}
+  .stat-change.down{color:var(--red);}
+  .grid-3{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .panel-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .panel-title svg{width:14px;height:14px;color:var(--text2);}
+  .panel-action{font-size:11px;color:var(--accent);cursor:pointer;font-family:var(--mono);}
+  .log-feed{padding:0;max-height:280px;overflow-y:auto;}
+  .log-entry{padding:9px 18px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;font-family:var(--mono);font-size:12px;}
+  .log-entry:last-child{border-bottom:none;}
+  .log-time{color:var(--text3);flex-shrink:0;width:68px;}
+  .log-level{flex-shrink:0;width:52px;font-weight:700;}
+  .log-level.INFO{color:var(--accent);}
+  .log-level.WARN,.log-level.WARNING{color:var(--amber);}
+  .log-level.ERROR{color:var(--red);}
+  .log-level.AUTO{color:var(--green);}
+  .log-level.GATE{color:var(--purple);}
+  .log-msg{color:var(--text);flex:1;}
+  .ch-table{width:100%;border-collapse:collapse;}
+  .ch-table th{text-align:left;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:10px 18px;border-bottom:1px solid var(--border);}
+  .ch-table td{padding:10px 18px;border-bottom:1px solid var(--border);font-size:12px;}
+  .ch-table tr:last-child td{border-bottom:none;}
+  .ch-table tr:hover td{background:var(--surface2);}
+  .peer-name{font-weight:500;color:var(--text);}
+  .peer-alias{font-size:11px;color:var(--text2);font-family:var(--mono);}
+  .bal-bar{width:100px;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;}
+  .bal-fill{height:100%;border-radius:3px;transition:width .5s;}
+  .bal-fill.ok{background:var(--green);}
+  .bal-fill.low{background:var(--amber);}
+  .bal-fill.critical{background:var(--red);}
+  .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;font-family:var(--mono);}
+  .tag.auto{background:rgba(67,209,122,.12);color:var(--green);}
+  .tag.pending{background:rgba(155,127,232,.12);color:var(--purple);}
+  .tag.idle{background:rgba(107,122,148,.12);color:var(--text2);}
+  .tag.warn{background:rgba(245,166,35,.12);color:var(--amber);}
+  .tag.offline{background:rgba(240,82,82,.12);color:var(--red);}
+  .approval-card{margin:14px;padding:14px;background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--purple);border-radius:6px;}
+  .approval-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
+  .approval-meta{font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:10px;}
+  .approval-actions{display:flex;gap:8px;}
+  .btn-approve{background:rgba(67,209,122,.12);color:var(--green);border:1px solid rgba(67,209,122,.3);padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--mono);}
+  .btn-reject{background:rgba(240,82,82,.1);color:var(--red);border:1px solid rgba(240,82,82,.25);padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--mono);}
+  .btn-snooze{background:transparent;color:var(--text2);border:1px solid var(--border);padding:5px 12px;border-radius:5px;font-size:11px;cursor:pointer;font-family:var(--mono);}
+  .mempool-row{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border);}
+  .mempool-row:last-child{border-bottom:none;}
+  .mempool-key{font-size:12px;color:var(--text2);}
+  .mempool-val{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text);}
+  .mempool-val.ok{color:var(--green);}
+  .mempool-val.warn{color:var(--amber);}
+  .empty-state{padding:24px 18px;text-align:center;color:var(--text2);font-size:12px;font-family:var(--mono);}
+  .refresh-badge{font-size:10px;color:var(--text3);font-family:var(--mono);margin-left:8px;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 </style>
 </head>
 <body>
@@ -115,7 +115,7 @@
       </div>
       <div>
         <div class="logo-text">LND AGENT</div>
-        <div class="logo-sub">v0.1.0 · dry-run</div>
+        <div class="logo-sub" id="mode-badge">v0.1.0 · loading...</div>
       </div>
     </div>
     <nav>
@@ -136,7 +136,7 @@
       <div class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
         Approvals
-        <span class="nav-badge">1</span>
+        <span class="nav-badge" id="approval-badge" style="display:none">0</span>
       </div>
       <div class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -157,8 +157,8 @@
       </div>
     </nav>
     <div class="status-bar">
-      <div class="status-dot"></div>
-      Agent running
+      <div class="status-dot" id="agent-dot"></div>
+      <span id="agent-status-text">Connecting...</span>
     </div>
   </aside>
 
@@ -166,12 +166,12 @@
     <div class="topbar">
       <div>
         <div class="topbar-title">Overview</div>
-        <div class="topbar-sub">Last cycle: 4 min ago · Next: 11 min · Cycle #47</div>
+        <div class="topbar-sub" id="topbar-sub">Loading...</div>
       </div>
       <div class="topbar-actions">
-        <button class="btn">Force cycle</button>
-        <button class="btn">Pause agent</button>
-        <button class="btn btn-primary">Go live</button>
+        <span class="refresh-badge" id="last-refresh">–</span>
+        <button class="btn" onclick="refreshAll()">Refresh now</button>
+        <button class="btn btn-primary" id="mode-btn" onclick="toggleMode()">Go live</button>
       </div>
     </div>
 
@@ -179,27 +179,27 @@
       <div class="stats-grid">
         <div class="stat-card green">
           <div class="stat-label">Routing revenue · 7d</div>
-          <div class="stat-value">4,821</div>
+          <div class="stat-value" id="stat-revenue">–</div>
           <div class="stat-sub">sats earned</div>
-          <div class="stat-change up">↑ 12% vs prior week</div>
+          <div class="stat-change" id="stat-revenue-sub" style="color:var(--text2)">loading...</div>
         </div>
         <div class="stat-card amber">
           <div class="stat-label">Rebalance spend · 7d</div>
-          <div class="stat-value">312</div>
+          <div class="stat-value" id="stat-rebalance">–</div>
           <div class="stat-sub">sats spent</div>
-          <div class="stat-change up">6.5% of revenue</div>
+          <div class="stat-change" id="stat-rebalance-sub" style="color:var(--text2)">loading...</div>
         </div>
         <div class="stat-card blue">
           <div class="stat-label">Active channels</div>
-          <div class="stat-value">14</div>
-          <div class="stat-sub">2 imbalanced · 0 zombie</div>
-          <div class="stat-change" style="color:var(--text2)">— no change</div>
+          <div class="stat-value" id="stat-channels">–</div>
+          <div class="stat-sub" id="stat-channels-sub">loading...</div>
+          <div class="stat-change" style="color:var(--text2)">live data</div>
         </div>
         <div class="stat-card red">
           <div class="stat-label">Pending approvals</div>
-          <div class="stat-value">1</div>
-          <div class="stat-sub">channel close rec</div>
-          <div class="stat-change" style="color:var(--amber)">expires in 3h 22m</div>
+          <div class="stat-value" id="stat-approvals">–</div>
+          <div class="stat-sub" id="stat-approvals-sub">loading...</div>
+          <div class="stat-change" id="stat-approvals-change" style="color:var(--text2)">–</div>
         </div>
       </div>
 
@@ -210,41 +210,12 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
               Channel health
             </div>
-            <span class="panel-action">View all →</span>
+            <span class="panel-action" onclick="refreshChannels()">Refresh →</span>
           </div>
           <table class="ch-table">
             <thead><tr><th>Peer</th><th>Balance</th><th>Local %</th><th>Status</th></tr></thead>
-            <tbody>
-              <tr>
-                <td><div class="peer-name">ACINQ</div><div class="peer-alias">03864ef...</div></td>
-                <td><div class="bal-bar"><div class="bal-fill ok" style="width:62%"></div></div></td>
-                <td style="font-family:var(--mono);color:var(--green)">62%</td>
-                <td><span class="tag idle">idle</span></td>
-              </tr>
-              <tr>
-                <td><div class="peer-name">WalletOfSatoshi</div><div class="peer-alias">035e4ff...</div></td>
-                <td><div class="bal-bar"><div class="bal-fill low" style="width:18%"></div></div></td>
-                <td style="font-family:var(--mono);color:var(--amber)">18%</td>
-                <td><span class="tag auto">rebalancing</span></td>
-              </tr>
-              <tr>
-                <td><div class="peer-name">Bitfinex</div><div class="peer-alias">033d8a...</div></td>
-                <td><div class="bal-bar"><div class="bal-fill ok" style="width:51%"></div></div></td>
-                <td style="font-family:var(--mono);color:var(--green)">51%</td>
-                <td><span class="tag idle">idle</span></td>
-              </tr>
-              <tr>
-                <td><div class="peer-name">LNMarkets</div><div class="peer-alias">02df5a...</div></td>
-                <td><div class="bal-bar"><div class="bal-fill critical" style="width:6%"></div></div></td>
-                <td style="font-family:var(--mono);color:var(--red)">6%</td>
-                <td><span class="tag warn">loop queued</span></td>
-              </tr>
-              <tr>
-                <td><div class="peer-name">OldNode2021</div><div class="peer-alias">027b3c...</div></td>
-                <td><div class="bal-bar"><div class="bal-fill ok" style="width:44%"></div></div></td>
-                <td style="font-family:var(--mono);color:var(--text2)">44%</td>
-                <td><span class="tag pending">close rec</span></td>
-              </tr>
+            <tbody id="channel-tbody">
+              <tr><td colspan="4" class="empty-state">Loading channels...</td></tr>
             </tbody>
           </table>
         </div>
@@ -257,14 +228,8 @@
                 Awaiting approval
               </div>
             </div>
-            <div class="approval-card">
-              <div class="approval-title">Close channel — OldNode2021</div>
-              <div class="approval-meta">45d zero routing · uptime 8% · capacity 1M sats<br>Expires in 3h 22m</div>
-              <div class="approval-actions">
-                <button class="btn-approve">APPROVE</button>
-                <button class="btn-reject">REJECT</button>
-                <button class="btn-snooze">snooze 7d</button>
-              </div>
+            <div id="approvals-container">
+              <div class="empty-state">No pending approvals</div>
             </div>
           </div>
 
@@ -275,11 +240,11 @@
                 Mempool
               </div>
             </div>
-            <div class="mempool-row"><span class="mempool-key">Economy fee</span><span class="mempool-val ok">8 sat/vbyte</span></div>
-            <div class="mempool-row"><span class="mempool-key">Fastest fee</span><span class="mempool-val">22 sat/vbyte</span></div>
-            <div class="mempool-row"><span class="mempool-key">Mempool size</span><span class="mempool-val ok">18 MB</span></div>
-            <div class="mempool-row"><span class="mempool-key">Congested</span><span class="mempool-val ok">No</span></div>
-            <div class="mempool-row"><span class="mempool-key">Fee mode</span><span class="mempool-val" style="color:var(--text2)">Normal (100 PPM)</span></div>
+            <div class="mempool-row"><span class="mempool-key">Economy fee</span><span class="mempool-val ok" id="mp-economy">–</span></div>
+            <div class="mempool-row"><span class="mempool-key">Fastest fee</span><span class="mempool-val" id="mp-fastest">–</span></div>
+            <div class="mempool-row"><span class="mempool-key">Mempool size</span><span class="mempool-val" id="mp-size">–</span></div>
+            <div class="mempool-row"><span class="mempool-key">Congested</span><span class="mempool-val" id="mp-congested">–</span></div>
+            <div class="mempool-row"><span class="mempool-key">Fee mode</span><span class="mempool-val" id="mp-mode" style="color:var(--text2)">–</span></div>
           </div>
         </div>
       </div>
@@ -290,22 +255,132 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             Agent log · live
           </div>
-          <span class="panel-action">Download full log</span>
+          <span class="panel-action" onclick="refreshLog()">Refresh</span>
         </div>
-        <div class="log-feed">
-          <div class="log-entry"><span class="log-time">03:47:12</span><span class="log-level INFO">INFO</span><span class="log-msg">--- Cycle 47 started ---</span></div>
-          <div class="log-entry"><span class="log-time">03:47:12</span><span class="log-level INFO">INFO</span><span class="log-msg">Mempool: 8 sat/vbyte · size 18MB · not congested</span></div>
-          <div class="log-entry"><span class="log-time">03:47:13</span><span class="log-level INFO">INFO</span><span class="log-msg">LNDg: 14 channels · 2 imbalanced · 1 dead candidate</span></div>
-          <div class="log-entry"><span class="log-time">03:47:14</span><span class="log-level AUTO">AUTO</span><span class="log-msg">Rebalancing WalletOfSatoshi — local 18%, moving 410,000 sats</span></div>
-          <div class="log-entry"><span class="log-time">03:47:18</span><span class="log-level AUTO">AUTO</span><span class="log-msg">Fee policy unchanged — congestion normal, rate 100 PPM</span></div>
-          <div class="log-entry"><span class="log-time">03:47:19</span><span class="log-level WARN">WARN</span><span class="log-msg">LNMarkets local balance 6% — rebalancing failed 3x, queuing Loop In</span></div>
-          <div class="log-entry"><span class="log-time">03:47:21</span><span class="log-level INFO">INFO</span><span class="log-msg">Loop In queued: 600,000 sats · max fee 0.5% · pending approval</span></div>
-          <div class="log-entry"><span class="log-time">03:47:22</span><span class="log-level GATE">GATE</span><span class="log-msg">Approval sent → Alby: close OldNode2021 (45d idle, 8% uptime)</span></div>
-          <div class="log-entry"><span class="log-time">03:47:22</span><span class="log-level INFO">INFO</span><span class="log-msg">--- Cycle 47 complete in 10.3s · next in 890s ---</span></div>
+        <div class="log-feed" id="log-feed">
+          <div class="empty-state">Loading log...</div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+async function fetchJSON(url){const r=await fetch(url);if(!r.ok)throw new Error(`${r.status}`);return r.json();}
+
+async function refreshStatus(){
+  try{
+    const d=await fetchJSON('/api/agent/status');
+    document.getElementById('agent-dot').className='status-dot'+(d.running?'':' offline');
+    document.getElementById('agent-status-text').textContent=d.running?'Agent running':'Agent stopped';
+    document.getElementById('mode-badge').textContent=`v0.1.0 · ${d.mode}`;
+    const btn=document.getElementById('mode-btn');
+    if(d.dry_run){btn.textContent='Go live';btn.className='btn btn-primary';}
+    else{btn.textContent='● Live';btn.className='btn btn-live';}
+    document.getElementById('topbar-sub').textContent=`Mode: ${d.mode} · Cycle every ${d.cycle_interval_minutes} min`;
+  }catch(e){
+    document.getElementById('agent-status-text').textContent='Cannot reach server';
+    document.getElementById('agent-dot').className='status-dot offline';
+  }
+}
+
+async function refreshStats(){
+  try{
+    const d=await fetchJSON('/api/stats');
+    document.getElementById('stat-revenue').textContent=d.revenue_7d_sats.toLocaleString();
+    document.getElementById('stat-rebalance').textContent=d.rebalance_cost_7d_sats.toLocaleString();
+    const r=d.cost_ratio_pct;
+    const el=document.getElementById('stat-rebalance-sub');
+    el.textContent=`${r}% of revenue`;
+    el.className='stat-change '+(r<20?'up':r<50?'':'down');
+  }catch(e){document.getElementById('stat-revenue').textContent='err';}
+}
+
+async function refreshChannels(){
+  try{
+    const d=await fetchJSON('/api/channels');
+    document.getElementById('stat-channels').textContent=d.active;
+    document.getElementById('stat-channels-sub').textContent=`${d.imbalanced} imbalanced · ${d.total-d.active} inactive`;
+    const tbody=document.getElementById('channel-tbody');
+    if(!d.channels.length){tbody.innerHTML='<tr><td colspan="4" class="empty-state">No channels found</td></tr>';return;}
+    tbody.innerHTML=d.channels.slice(0,8).map(ch=>{
+      const pct=ch.local_pct;
+      const col=ch.bal_status==='ok'?'green':ch.bal_status==='low'?'amber':'red';
+      const tag=ch.is_active
+        ?(pct<20||pct>80?'<span class="tag warn">imbalanced</span>':'<span class="tag idle">idle</span>')
+        :'<span class="tag offline">offline</span>';
+      return `<tr>
+        <td><div class="peer-name">${ch.alias}</div><div class="peer-alias">${ch.pubkey}</div></td>
+        <td><div class="bal-bar"><div class="bal-fill ${ch.bal_status}" style="width:${Math.min(pct,100)}%"></div></div></td>
+        <td style="font-family:var(--mono);color:var(--${col})">${pct}%</td>
+        <td>${tag}</td></tr>`;
+    }).join('');
+  }catch(e){document.getElementById('channel-tbody').innerHTML='<tr><td colspan="4" class="empty-state">Cannot reach LNDg</td></tr>';}
+}
+
+async function refreshMempool(){
+  try{
+    const d=await fetchJSON('/api/mempool');
+    const c=d.congested;
+    document.getElementById('mp-economy').textContent=`${d.economy_fee} sat/vbyte`;
+    document.getElementById('mp-economy').className=`mempool-val ${d.economy_fee<20?'ok':'warn'}`;
+    document.getElementById('mp-fastest').textContent=`${d.fastest_fee} sat/vbyte`;
+    document.getElementById('mp-size').textContent=`${d.size_mb} MB`;
+    document.getElementById('mp-size').className=`mempool-val ${c?'warn':'ok'}`;
+    document.getElementById('mp-congested').textContent=c?'Yes':'No';
+    document.getElementById('mp-congested').className=`mempool-val ${c?'warn':'ok'}`;
+    document.getElementById('mp-mode').textContent=`${d.fee_mode} (${d.fee_ppm} PPM)`;
+  }catch(e){document.getElementById('mp-economy').textContent='unavailable';}
+}
+
+async function refreshLog(){
+  try{
+    const d=await fetchJSON('/api/log?lines=30');
+    const feed=document.getElementById('log-feed');
+    if(!d.lines.length){feed.innerHTML='<div class="empty-state">No log entries yet — run a cycle first</div>';return;}
+    feed.innerHTML=d.lines.map(l=>`<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-level ${l.level}">${l.level}</span><span class="log-msg">${l.message}</span></div>`).join('');
+    feed.scrollTop=feed.scrollHeight;
+  }catch(e){document.getElementById('log-feed').innerHTML='<div class="empty-state">Log unavailable</div>';}
+}
+
+async function refreshApprovals(){
+  try{
+    const d=await fetchJSON('/api/approvals');
+    const approvals=d.approvals||[];
+    const badge=document.getElementById('approval-badge');
+    document.getElementById('stat-approvals').textContent=approvals.length;
+    document.getElementById('stat-approvals-sub').textContent=approvals.length?'action required':'none pending';
+    badge.style.display=approvals.length?'inline':'none';
+    badge.textContent=approvals.length;
+    const container=document.getElementById('approvals-container');
+    if(!approvals.length){container.innerHTML='<div class="empty-state">No pending approvals</div>';return;}
+    container.innerHTML=approvals.map(a=>`<div class="approval-card">
+      <div class="approval-title">${a.summary}</div>
+      <div class="approval-meta">${a.meta||''}<br>Expires: ${a.expires_at||'–'}</div>
+      <div class="approval-actions">
+        <button class="btn-approve" onclick="respond('${a.id}','APPROVE')">APPROVE</button>
+        <button class="btn-reject" onclick="respond('${a.id}','REJECT')">REJECT</button>
+        <button class="btn-snooze" onclick="respond('${a.id}','SNOOZE_7_DAYS')">snooze 7d</button>
+      </div></div>`).join('');
+  }catch(e){document.getElementById('stat-approvals').textContent='–';}
+}
+
+async function respond(id,outcome){
+  try{
+    await fetch(`/api/approvals/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({outcome})});
+    await refreshApprovals();
+  }catch(e){alert(`Failed: ${e.message}`);}
+}
+
+function toggleMode(){alert('Edit dry_run in config/config.yml and restart the agent to toggle live mode.');}
+
+async function refreshAll(){
+  await Promise.allSettled([refreshStatus(),refreshStats(),refreshChannels(),refreshMempool(),refreshLog(),refreshApprovals()]);
+  document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+refreshAll();
+setInterval(refreshAll,30000);
+</script>
 </body>
 </html>
