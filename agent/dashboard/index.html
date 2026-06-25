@@ -38,7 +38,7 @@
   .btn-primary:hover{background:#7dd3fc;color:#000;}
   .btn-live{background:rgba(67,209,122,.15);color:var(--green);border-color:rgba(67,209,122,.4);}
   .content{padding:24px 28px;overflow-y:auto;flex:1;}
-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;position:relative;overflow:hidden;}
   .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
   .stat-card.green::before{background:var(--green);}
@@ -284,6 +284,12 @@
           <div class="stat-value" id="stat-approvals">–</div>
           <div class="stat-sub" id="stat-approvals-sub">loading...</div>
           <div class="stat-change" id="stat-approvals-change" style="color:var(--text2)">–</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Mempool fee rate</div>
+          <div class="stat-value" id="stat-fee-rate">–</div>
+          <div class="stat-sub" id="stat-fee-sub">sat/vB</div>
+          <div class="stat-change" id="stat-fee-mode" style="color:var(--text2)">loading...</div>
         </div>
       </div>
 
@@ -607,6 +613,11 @@ async function refreshMempool(){
     document.getElementById('mp-congested').textContent=c?'Yes':'No';
     document.getElementById('mp-congested').className=`mempool-val ${c?'warn':'ok'}`;
     document.getElementById('mp-mode').textContent=`${d.fee_mode} (${d.fee_ppm} PPM)`;
+    // Stat card
+    document.getElementById('stat-fee-rate').textContent=d.fastest_fee;
+    document.getElementById('stat-fee-sub').textContent=`sat/vB fastest · ${d.economy_fee} economy`;
+    document.getElementById('stat-fee-mode').textContent=c?'⚠ Congested':'Normal';
+    document.getElementById('stat-fee-mode').style.color=c?'var(--amber)':'var(--green)';
   }catch(e){document.getElementById('mp-economy').textContent='unavailable';}
 }
 
