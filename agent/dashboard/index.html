@@ -140,6 +140,35 @@
   .view{display:none;}
   .view.active{display:block;}
   .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .peer-row{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border);cursor:default;transition:background .1s;}
+  .peer-row:last-child{border-bottom:none;}
+  .peer-row:hover{background:var(--surface2);}
+  .peer-rec-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .peer-rec-dot.recommended{background:var(--green);box-shadow:0 0 5px var(--green);}
+  .peer-rec-dot.consider{background:var(--amber);}
+  .peer-rec-dot.skip{background:var(--red);}
+  .peer-alias-col{flex:1;font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .peer-ch-col{font-size:11px;font-family:var(--mono);color:var(--text2);width:42px;text-align:right;flex-shrink:0;}
+  .peer-cap-col{font-size:11px;font-family:var(--mono);color:var(--text2);width:68px;text-align:right;flex-shrink:0;}
+  .peer-loc-col{font-size:11px;color:var(--text3);width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+  .peer-tooltip{position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;width:296px;box-shadow:0 10px 36px rgba(0,0,0,.75);z-index:2000;display:none;pointer-events:none;overflow:hidden;}
+  .pt-head{padding:12px 14px;border-bottom:1px solid var(--border);}
+  .pt-alias{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px;}
+  .pt-pubkey{font-size:10px;color:var(--text3);font-family:var(--mono);}
+  .pt-stats{padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px;border-bottom:1px solid var(--border);}
+  .pt-stat dt{font-size:10px;color:var(--text3);margin-bottom:1px;}
+  .pt-stat dd{font-size:12px;font-family:var(--mono);color:var(--text);font-weight:500;}
+  .pt-stat.wide{grid-column:span 2;}
+  .pt-reasons{padding:10px 14px;border-bottom:1px solid var(--border);}
+  .pt-reason{font-size:11px;color:var(--text2);padding:1px 0;padding-left:12px;position:relative;}
+  .pt-reason::before{content:'·';position:absolute;left:2px;color:var(--text3);}
+  .pt-rec{padding:10px 14px;text-align:center;font-size:12px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;}
+  .pt-rec.recommended{color:var(--green);}
+  .pt-rec.consider{color:var(--amber);}
+  .pt-rec.skip{color:var(--red);}
+  .peer-list-header{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;}
+  .peer-list-header .peer-ch-col,.peer-list-header .peer-cap-col,.peer-list-header .peer-loc-col{color:var(--text3);}
+</style>
   .bell-wrap{position:relative;cursor:pointer;padding:7px;border-radius:7px;transition:background .15s;display:flex;align-items:center;justify-content:center;color:var(--text2);}
   .bell-wrap:hover,.bell-wrap:focus{background:var(--surface2);color:var(--text);outline:none;}
   .bell-wrap svg{width:18px;height:18px;}
@@ -194,6 +223,11 @@
       <div class="nav-item" data-view="safety" onclick="switchView('safety')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Safety
+      </div>
+      <div class="nav-section">Discovery</div>
+      <div class="nav-item" data-view="peerscout" onclick="switchView('peerscout')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        Peer Scout
       </div>
     </nav>
     <div class="status-bar">
@@ -413,9 +447,32 @@
       </div>
     </div><!-- /view-safety -->
 
+    <div class="view" id="view-peerscout">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            Peer Scout — suggested channels to open
+          </span>
+          <span class="panel-action" onclick="refreshPeerScout()">Refresh</span>
+        </div>
+        <div class="peer-list-header">
+          <div style="width:9px;flex-shrink:0"></div>
+          <div style="flex:1">Node</div>
+          <div class="peer-ch-col">Ch</div>
+          <div class="peer-cap-col">Capacity</div>
+          <div class="peer-loc-col">Location</div>
+        </div>
+        <div id="peerscout-list"><div class="empty-state">Loading...</div></div>
+      </div>
+    </div><!-- /view-peerscout -->
+
     </div><!-- /content -->
   </div>
 </div>
+
+<!-- Peer hover tooltip -->
+<div class="peer-tooltip" id="peer-tooltip"></div>
 
 <div class="ctx-menu" id="bell-ctx-menu">
   <div class="ctx-label" id="bell-ctx-label">LND+ Messages</div>
@@ -599,6 +656,79 @@ async function refreshAll(){
   document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
 }
 
+// ── Peer Scout ────────────────────────────────────────────
+let _peerData = [];
+
+async function refreshPeerScout() {
+  const container = document.getElementById('peerscout-list');
+  container.innerHTML = '<div class="empty-state">Scanning network...</div>';
+  try {
+    const d = await fetchJSON('/api/peers/suggestions');
+    _peerData = d.peers || [];
+    if (!_peerData.length) {
+      container.innerHTML = '<div class="empty-state">No suggestions found</div>';
+      return;
+    }
+    container.innerHTML = _peerData.map((p, i) => {
+      const cap = p.capacity_btc >= 1
+        ? p.capacity_btc.toFixed(1) + ' BTC'
+        : Math.round(p.capacity_sats / 1000).toLocaleString() + 'k';
+      return `<div class="peer-row" data-idx="${i}"
+          onmouseenter="showPeerTip(event,${i})" onmousemove="movePeerTip(event)" onmouseleave="hidePeerTip()">
+        <div class="peer-rec-dot ${p.recommendation}"></div>
+        <div class="peer-alias-col">${p.alias}</div>
+        <div class="peer-ch-col">${p.channels.toLocaleString()}</div>
+        <div class="peer-cap-col">${cap}</div>
+        <div class="peer-loc-col">${p.location || '—'}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state">Failed to load — ' + e.message + '</div>';
+  }
+}
+
+function showPeerTip(e, idx) {
+  const p = _peerData[idx];
+  if (!p) return;
+  const cap   = p.capacity_btc.toFixed(2) + ' BTC';
+  const ranks = [p.liq_rank ? `Liquidity #${p.liq_rank}` : null,
+                 p.conn_rank ? `Connectivity #${p.conn_rank}` : null]
+                .filter(Boolean).join(' · ') || '—';
+  const recText = {
+    recommended: '✓ RECOMMENDED — open a channel',
+    consider:    '~ WORTH CONSIDERING',
+    skip:        '✕ PROBABLY SKIP',
+  }[p.recommendation];
+  document.getElementById('peer-tooltip').innerHTML = `
+    <div class="pt-head">
+      <div class="pt-alias">${p.alias}</div>
+      <div class="pt-pubkey">${p.pubkey.slice(0,10)}…${p.pubkey.slice(-10)}</div>
+    </div>
+    <div class="pt-stats">
+      <dl class="pt-stat"><dt>Channels</dt><dd>${p.channels.toLocaleString()}</dd></dl>
+      <dl class="pt-stat"><dt>Capacity</dt><dd>${cap}</dd></dl>
+      <dl class="pt-stat"><dt>Location</dt><dd>${p.location || '—'}</dd></dl>
+      <dl class="pt-stat"><dt>Last seen</dt><dd>${p.last_seen_days === 0 ? 'Today' : p.last_seen_days + 'd ago'}</dd></dl>
+      <dl class="pt-stat wide"><dt>Ranking</dt><dd>${ranks}</dd></dl>
+    </div>
+    <div class="pt-reasons">${p.reasons.map(r => `<div class="pt-reason">${r}</div>`).join('')}</div>
+    <div class="pt-rec ${p.recommendation}">${recText}</div>`;
+  document.getElementById('peer-tooltip').style.display = 'block';
+  movePeerTip(e);
+}
+
+function movePeerTip(e) {
+  const t = document.getElementById('peer-tooltip');
+  const x = Math.min(e.clientX + 16, window.innerWidth  - 312);
+  const y = Math.min(e.clientY +  8, window.innerHeight - 280);
+  t.style.left = x + 'px';
+  t.style.top  = y + 'px';
+}
+
+function hidePeerTip() {
+  document.getElementById('peer-tooltip').style.display = 'none';
+}
+
 // ── LND+ bell ─────────────────────────────────────────────
 let _bellCount = 0;
 let _bellNotifs = [];
@@ -673,6 +803,7 @@ const _VIEW_META = {
   feepolicy:   ['Fee Policy',   'AF band changes by cycle'],
   connections: ['Connections',  'Backend health check'],
   safety:      ['Safety',       'SCB age and node health'],
+  peerscout:   ['Peer Scout',   'Suggested nodes to open channels with — hover for details'],
 };
 
 function switchView(name) {
@@ -685,7 +816,8 @@ function switchView(name) {
   document.getElementById('topbar-sub').textContent = sub;
   ({overview:refreshAll,channels:refreshChannelDetail,cyclelog:refreshCycleLog,
     approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
-    feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety}
+    feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety,
+    peerscout:refreshPeerScout}
   )[name]?.();
 }
 

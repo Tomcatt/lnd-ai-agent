@@ -507,6 +507,143 @@ def api_feepolicy_history():
     return jsonify({"cycles": list(reversed(cycles[-50:]))})
 
 
+_peer_suggestions_cache: dict = {"peers": [], "ts": 0.0}
+_PEER_SUGGESTIONS_TTL = 900  # 15 minutes — peer landscape doesn't change quickly
+
+@app.route("/api/peers/suggestions")
+def api_peer_suggestions():
+    import time as _t
+    from datetime import datetime
+    now = _t.time()
+
+    if now - _peer_suggestions_cache["ts"] < _PEER_SUGGESTIONS_TTL:
+        return jsonify({"peers": _peer_suggestions_cache["peers"], "cached": True})
+
+    try:
+        config = load_config()
+        mempool_base = config["endpoints"]["mempool_api"]
+        lndg_base    = config["endpoints"]["lndg_api"]
+        lnd_ip       = config["endpoints"]["lnd_grpc"].split(":")[0]
+        mac_path     = config["credentials"]["lit_macaroon_path"]
+        tls_cert     = config["credentials"].get("lnd_tls_cert_path")
+        auth         = HTTPBasicAuth(config["credentials"]["lndg_user"],
+                                     config["credentials"]["lndg_pass"])
+
+        # Our own pubkey from LND
+        with open(mac_path, "rb") as fh:
+            mac_hex = fh.read().hex()
+        info = requests.get(
+            f"https://{lnd_ip}:8080/v1/getinfo",
+            headers={"Grpc-Metadata-macaroon": mac_hex},
+            verify=tls_cert or False, timeout=8,
+        ).json()
+        our_pubkey = info.get("identity_pubkey", "")
+
+        # Existing open-channel peers
+        chs_r = requests.get(f"{lndg_base}/api/channels/", auth=auth, timeout=10).json()
+        our_peers = {c["remote_pubkey"] for c in chs_r.get("results", []) if c.get("is_open")}
+
+        # Top nodes from local mempool (two ranking lists)
+        liq  = requests.get(f"{mempool_base}/api/v1/lightning/nodes/rankings/liquidity",    timeout=10).json()
+        conn = requests.get(f"{mempool_base}/api/v1/lightning/nodes/rankings/connectivity", timeout=10).json()
+
+        liq_ranks  = {n["publicKey"]: i + 1 for i, n in enumerate(liq)}
+        conn_ranks = {n["publicKey"]: i + 1 for i, n in enumerate(conn)}
+
+        all_nodes = {n["publicKey"]: n for n in liq}
+        for n in conn:
+            if n["publicKey"] not in all_nodes:
+                all_nodes[n["publicKey"]] = n
+
+        stale_cutoff = now - 30 * 86400
+
+        results = []
+        for pk, n in all_nodes.items():
+            if pk in (our_pubkey,) or pk in our_peers:
+                continue
+
+            channels     = n.get("channels", 0)
+            cap_sats     = n.get("capacity", 0)
+            cap_btc      = round(cap_sats / 1e8, 2)
+            last_update  = n.get("updatedAt") or 0
+            days_ago     = max(0, round((now - last_update) / 86400))
+            is_stale     = last_update < stale_cutoff
+            liq_rank     = liq_ranks.get(pk)
+            conn_rank    = conn_ranks.get(pk)
+            in_both      = bool(liq_rank and conn_rank)
+
+            score   = 0
+            reasons = []
+
+            # Channel count
+            if channels >= 200:
+                score += 3; reasons.append(f"{channels:,} channels — highly connected")
+            elif channels >= 50:
+                score += 2; reasons.append(f"{channels:,} channels — well connected")
+            elif channels >= 10:
+                score += 1; reasons.append(f"{channels:,} channels")
+            else:
+                reasons.append(f"Only {channels} channels — lightly connected")
+
+            # Capacity
+            if cap_sats >= 5_000_000_000:
+                score += 3; reasons.append(f"{cap_btc} BTC total capacity — major hub")
+            elif cap_sats >= 500_000_000:
+                score += 2; reasons.append(f"{cap_btc} BTC total capacity")
+            else:
+                score += 1; reasons.append(f"{cap_btc} BTC total capacity — smaller node")
+
+            # Dual ranking bonus
+            if in_both:
+                score += 2; reasons.append("Top-ranked for both liquidity & connectivity")
+            elif liq_rank:
+                reasons.append(f"Ranked #{liq_rank} by liquidity")
+            else:
+                reasons.append(f"Ranked #{conn_rank} by connectivity")
+
+            # Staleness penalty
+            if is_stale:
+                score -= 3
+                reasons.append(f"Not seen in {days_ago} days — may be offline")
+
+            # Location
+            country = n.get("country") or {}
+            city    = n.get("city")    or {}
+            country_en = country.get("en", "") if isinstance(country, dict) else ""
+            city_en    = city.get("en", "")    if isinstance(city,    dict) else ""
+            location   = ", ".join(filter(None, [city_en, country_en]))
+
+            rec = "recommended" if score >= 6 else "consider" if score >= 3 else "skip"
+
+            results.append({
+                "pubkey":       pk,
+                "alias":        n.get("alias") or "Unknown",
+                "channels":     channels,
+                "capacity_btc": cap_btc,
+                "capacity_sats": cap_sats,
+                "location":     location,
+                "iso_code":     n.get("iso_code", ""),
+                "liq_rank":     liq_rank,
+                "conn_rank":    conn_rank,
+                "last_seen_days": days_ago,
+                "recommendation": rec,
+                "reasons":      reasons,
+                "score":        score,
+            })
+
+        _ORDER = {"recommended": 0, "consider": 1, "skip": 2}
+        results.sort(key=lambda x: (_ORDER[x["recommendation"]], -x["score"]))
+        results = results[:50]
+
+        _peer_suggestions_cache.update({"peers": results, "ts": now})
+        return jsonify({"peers": results, "cached": False})
+
+    except Exception as e:
+        if _peer_suggestions_cache["ts"] > 0:
+            return jsonify({"peers": _peer_suggestions_cache["peers"], "cached": True, "stale": True})
+        return jsonify({"error": str(e), "peers": []}), 503
+
+
 _lnplus_cache: dict = {"count": 0, "notifications": [], "ts": 0.0}
 _LNPLUS_TTL = 240  # seconds (challenge expires after 5 min, we refresh at 4)
 
