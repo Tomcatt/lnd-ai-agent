@@ -384,6 +384,14 @@ def api_approval_response(request_id):
         }
         with open(responses_file, "w") as f:
             json.dump(existing, f, indent=2)
+        # Remove immediately from pending so the UI updates without waiting for agent cycle
+        approvals_file = Path(_REPO_ROOT) / "agent" / "logs" / "pending_approvals.json"
+        if approvals_file.exists():
+            with open(approvals_file) as f:
+                pending = json.load(f)
+            pending["approvals"] = [a for a in pending.get("approvals", []) if a.get("id") != request_id]
+            with open(approvals_file, "w") as f:
+                json.dump(pending, f, indent=2)
         return jsonify({"status": "recorded", "outcome": outcome})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
