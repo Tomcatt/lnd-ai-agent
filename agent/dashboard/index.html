@@ -1105,7 +1105,15 @@ function showPeerTip(e, idx, source) {
     recommended: '✓ RECOMMENDED — open a channel',
     consider:    '~ WORTH CONSIDERING',
     skip:        '✕ PROBABLY SKIP',
-  }[p.recommendation];
+    green:       '✓ RECOMMENDED — open a channel',
+    amber:       '~ WORTH CONSIDERING',
+    red:         '✕ PROBABLY SKIP',
+  }[p.recommendation] || '';
+  const seenStr = p.last_seen_days !== undefined
+    ? (p.last_seen_days === 0 ? 'Today' : p.last_seen_days + 'd ago')
+    : _poolSeenStr(p.last_seen_at);
+  const recClass = {recommended:'recommended', consider:'consider', skip:'skip',
+                    green:'recommended', amber:'consider', red:'skip'}[p.recommendation] || '';
   document.getElementById('peer-tooltip').innerHTML = `
     <div class="pt-head">
       <div class="pt-alias">${p.alias}</div>
@@ -1114,12 +1122,12 @@ function showPeerTip(e, idx, source) {
     <div class="pt-stats">
       <dl class="pt-stat"><dt>Channels</dt><dd>${p.channels.toLocaleString()}</dd></dl>
       <dl class="pt-stat"><dt>Capacity</dt><dd>${cap}</dd></dl>
-      <dl class="pt-stat"><dt>Location</dt><dd>${p.location || '—'}</dd></dl>
-      <dl class="pt-stat"><dt>Last seen</dt><dd>${p.last_seen_days === 0 ? 'Today' : p.last_seen_days + 'd ago'}</dd></dl>
+      <dl class="pt-stat"><dt>Location</dt><dd>${p.location || p.conn_type || '—'}</dd></dl>
+      <dl class="pt-stat"><dt>Last seen</dt><dd>${seenStr}</dd></dl>
       <dl class="pt-stat wide"><dt>Ranking</dt><dd>${ranks}</dd></dl>
     </div>
-    <div class="pt-reasons">${p.reasons.map(r => `<div class="pt-reason">${r}</div>`).join('')}</div>
-    <div class="pt-rec ${p.recommendation}">${recText}</div>`;
+    <div class="pt-reasons">${(p.reasons||[]).map(r => `<div class="pt-reason">${r}</div>`).join('')}</div>
+    <div class="pt-rec ${recClass}">${recText}</div>`;
   document.getElementById('peer-tooltip').style.display = 'block';
   movePeerTip(e);
 }
