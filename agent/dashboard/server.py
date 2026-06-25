@@ -507,6 +507,50 @@ def api_feepolicy_history():
     return jsonify({"cycles": list(reversed(cycles[-50:]))})
 
 
+_BOOKMARKS_FILE = Path(_REPO_ROOT) / "agent" / "logs" / "bookmarks.json"
+
+def _load_bookmarks() -> dict:
+    if _BOOKMARKS_FILE.exists():
+        with open(_BOOKMARKS_FILE) as f:
+            return json.load(f)
+    return {}
+
+def _save_bookmarks(data: dict):
+    with open(_BOOKMARKS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+@app.route("/api/bookmarks", methods=["GET"])
+def api_bookmarks_get():
+    try:
+        return jsonify({"bookmarks": list(_load_bookmarks().values())})
+    except Exception as e:
+        return jsonify({"bookmarks": [], "error": str(e)})
+
+@app.route("/api/bookmarks", methods=["POST"])
+def api_bookmarks_add():
+    peer = request.json
+    if not peer or not peer.get("pubkey"):
+        return jsonify({"error": "pubkey required"}), 400
+    try:
+        data = _load_bookmarks()
+        peer["bookmarked_at"] = datetime.utcnow().isoformat()
+        data[peer["pubkey"]] = peer
+        _save_bookmarks(data)
+        return jsonify({"ok": True, "count": len(data)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/bookmarks/<pubkey>", methods=["DELETE"])
+def api_bookmarks_remove(pubkey):
+    try:
+        data = _load_bookmarks()
+        data.pop(pubkey, None)
+        _save_bookmarks(data)
+        return jsonify({"ok": True, "count": len(data)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 _peer_suggestions_cache: dict = {"peers": [], "ts": 0.0}
 _PEER_SUGGESTIONS_TTL = 900  # 15 minutes — peer landscape doesn't change quickly
 

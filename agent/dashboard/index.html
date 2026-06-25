@@ -168,6 +168,12 @@
   .pt-rec.skip{color:var(--red);}
   .peer-list-header{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;}
   .peer-list-header .peer-ch-col,.peer-list-header .peer-cap-col,.peer-list-header .peer-loc-col{color:var(--text3);}
+  .peer-alias-col{cursor:pointer;}
+  .peer-alias-col:hover{color:var(--accent);text-decoration:underline;}
+  .bookmark-btn{background:none;border:none;cursor:pointer;padding:2px 5px;color:var(--text3);flex-shrink:0;line-height:1;border-radius:4px;transition:color .15s;}
+  .bookmark-btn:hover{color:var(--amber);}
+  .bookmark-btn.active{color:var(--amber);}
+  .bookmark-btn svg{width:14px;height:14px;display:block;}
   .bell-wrap{position:relative;cursor:pointer;padding:7px;border-radius:7px;transition:background .15s;display:flex;align-items:center;justify-content:center;color:var(--text2);}
   .bell-wrap:hover,.bell-wrap:focus{background:var(--surface2);color:var(--text);outline:none;}
   .bell-wrap svg{width:18px;height:18px;}
@@ -227,6 +233,11 @@
       <div class="nav-item" data-view="peerscout" onclick="switchView('peerscout')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         Peer Scout
+      </div>
+      <div class="nav-item" data-view="bookmarks" onclick="switchView('bookmarks')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        Bookmarks
+        <span class="nav-badge" id="bookmark-badge" style="display:none">0</span>
       </div>
     </nav>
     <div class="status-bar">
@@ -472,6 +483,27 @@
       </div>
     </div><!-- /view-peerscout -->
 
+    <div class="view" id="view-bookmarks">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Bookmarked peers
+          </span>
+          <span class="panel-action" onclick="refreshBookmarks()">Refresh</span>
+        </div>
+        <div class="peer-list-header">
+          <div style="width:9px;flex-shrink:0"></div>
+          <div style="flex:1">Node</div>
+          <div class="peer-ch-col">Ch</div>
+          <div class="peer-cap-col">Capacity</div>
+          <div class="peer-loc-col">Location</div>
+          <div style="width:28px;flex-shrink:0"></div>
+        </div>
+        <div id="bookmarks-list"><div class="empty-state">No bookmarks yet — star a peer in Peer Scout</div></div>
+      </div>
+    </div><!-- /view-bookmarks -->
+
     </div><!-- /content -->
   </div>
 </div>
@@ -666,39 +698,93 @@ async function refreshAll(){
   document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
 }
 
-// ── Peer Scout ────────────────────────────────────────────
+// ── Peer Scout + Bookmarks ────────────────────────────────
 let _peerData = [];
+let _bookmarkedPubkeys = new Set();
+
+function _capStr(p) {
+  return p.capacity_btc >= 1
+    ? p.capacity_btc.toFixed(1) + ' BTC'
+    : Math.round(p.capacity_sats / 1000).toLocaleString() + 'k';
+}
+
+function _peerRow(p, i, source) {
+  const bm = _bookmarkedPubkeys.has(p.pubkey);
+  const starSvg = bm
+    ? `<svg viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+  return `<div class="peer-row" data-idx="${i}" data-src="${source}"
+      onmouseenter="showPeerTip(event,${i},'${source}')" onmousemove="movePeerTip(event)" onmouseleave="hidePeerTip()">
+    <div class="peer-rec-dot ${p.recommendation}"></div>
+    <div class="peer-alias-col" onclick="window.open('https://amboss.space/node/${p.pubkey}','_blank','noopener')">${p.alias}</div>
+    <div class="peer-ch-col">${p.channels.toLocaleString()}</div>
+    <div class="peer-cap-col">${_capStr(p)}</div>
+    <div class="peer-loc-col">${p.location || '—'}</div>
+    <button class="bookmark-btn ${bm?'active':''}" onclick="toggleBookmark(event,'${source}',${i})" title="${bm?'Remove bookmark':'Bookmark'}">${starSvg}</button>
+  </div>`;
+}
 
 async function refreshPeerScout() {
   const container = document.getElementById('peerscout-list');
   container.innerHTML = '<div class="empty-state">Scanning network...</div>';
   try {
-    const d = await fetchJSON('/api/peers/suggestions');
+    const [d, bm] = await Promise.all([fetchJSON('/api/peers/suggestions'), fetchJSON('/api/bookmarks')]);
     _peerData = d.peers || [];
-    if (!_peerData.length) {
-      container.innerHTML = '<div class="empty-state">No suggestions found</div>';
-      return;
-    }
-    container.innerHTML = _peerData.map((p, i) => {
-      const cap = p.capacity_btc >= 1
-        ? p.capacity_btc.toFixed(1) + ' BTC'
-        : Math.round(p.capacity_sats / 1000).toLocaleString() + 'k';
-      return `<div class="peer-row" data-idx="${i}"
-          onmouseenter="showPeerTip(event,${i})" onmousemove="movePeerTip(event)" onmouseleave="hidePeerTip()">
-        <div class="peer-rec-dot ${p.recommendation}"></div>
-        <div class="peer-alias-col">${p.alias}</div>
-        <div class="peer-ch-col">${p.channels.toLocaleString()}</div>
-        <div class="peer-cap-col">${cap}</div>
-        <div class="peer-loc-col">${p.location || '—'}</div>
-      </div>`;
-    }).join('');
+    _bookmarkedPubkeys = new Set((bm.bookmarks || []).map(b => b.pubkey));
+    _updateBookmarkBadge();
+    if (!_peerData.length) { container.innerHTML = '<div class="empty-state">No suggestions found</div>'; return; }
+    container.innerHTML = _peerData.map((p, i) => _peerRow(p, i, 'scout')).join('');
   } catch(e) {
     container.innerHTML = '<div class="empty-state">Failed to load — ' + e.message + '</div>';
   }
 }
 
-function showPeerTip(e, idx) {
-  const p = _peerData[idx];
+async function refreshBookmarks() {
+  const container = document.getElementById('bookmarks-list');
+  try {
+    const bm = await fetchJSON('/api/bookmarks');
+    const list = bm.bookmarks || [];
+    _bookmarkedPubkeys = new Set(list.map(b => b.pubkey));
+    _updateBookmarkBadge();
+    if (!list.length) { container.innerHTML = '<div class="empty-state">No bookmarks yet — star a peer in Peer Scout</div>'; return; }
+    container.innerHTML = list.map((p, i) => _peerRow(p, i, 'bm')).join('');
+    // Keep bm data accessible for tooltip
+    window._bmData = list;
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state">Failed to load bookmarks</div>';
+  }
+}
+
+async function toggleBookmark(e, source, idx) {
+  e.stopPropagation();
+  const p = source === 'scout' ? _peerData[idx] : (window._bmData || [])[idx];
+  if (!p) return;
+  const wasBm = _bookmarkedPubkeys.has(p.pubkey);
+  if (wasBm) {
+    await fetch(`/api/bookmarks/${p.pubkey}`, {method:'DELETE'});
+    _bookmarkedPubkeys.delete(p.pubkey);
+  } else {
+    await fetch('/api/bookmarks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+    _bookmarkedPubkeys.add(p.pubkey);
+  }
+  _updateBookmarkBadge();
+  // Re-render the active list so the star updates immediately
+  if (source === 'scout') {
+    document.getElementById('peerscout-list').innerHTML = _peerData.map((p2, i) => _peerRow(p2, i, 'scout')).join('');
+  } else {
+    refreshBookmarks();
+  }
+}
+
+function _updateBookmarkBadge() {
+  const badge = document.getElementById('bookmark-badge');
+  const n = _bookmarkedPubkeys.size;
+  badge.textContent = n;
+  badge.style.display = n ? '' : 'none';
+}
+
+function showPeerTip(e, idx, source) {
+  const p = source === 'bm' ? (window._bmData || [])[idx] : _peerData[idx];
   if (!p) return;
   const cap   = p.capacity_btc.toFixed(2) + ' BTC';
   const ranks = [p.liq_rank ? `Liquidity #${p.liq_rank}` : null,
@@ -814,6 +900,7 @@ const _VIEW_META = {
   connections: ['Connections',  'Backend health check'],
   safety:      ['Safety',       'SCB age and node health'],
   peerscout:   ['Peer Scout',   'Suggested nodes to open channels with — hover for details'],
+  bookmarks:   ['Bookmarks',   'Saved peers — click name to open on Amboss'],
 };
 
 function switchView(name) {
@@ -827,7 +914,7 @@ function switchView(name) {
   ({overview:refreshAll,channels:refreshChannelDetail,cyclelog:refreshCycleLog,
     approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
     feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety,
-    peerscout:refreshPeerScout}
+    peerscout:refreshPeerScout,bookmarks:refreshBookmarks}
   )[name]?.();
 }
 
