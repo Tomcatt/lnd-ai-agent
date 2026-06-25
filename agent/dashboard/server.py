@@ -11,10 +11,12 @@ import re
 import json
 import time as _time
 import logging
+import signal
 import yaml
 import requests
+import concurrent.futures
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from requests.auth import HTTPBasicAuth
 from flask import Flask, jsonify, send_from_directory, request
 
@@ -740,6 +742,217 @@ def api_peer_suggestions():
         if _peer_suggestions_cache["ts"] > 0:
             return jsonify({"peers": _peer_suggestions_cache["peers"], "cached": True, "stale": True})
         return jsonify({"error": str(e), "peers": []}), 503
+
+
+# ── LN+ Pool Browser ─────────────────────────────────────────────────────────
+OUR_MAX_CHANNEL_SAT = 2_000_000
+
+_pool_cache: dict = {"nodes": [], "stats": {}, "ts": 0.0}
+_POOL_TTL = 21600  # 6 hours
+
+
+def _lnplus_get_node(pubkey: str) -> dict:
+    try:
+        r = requests.get(
+            f"https://lightningnetwork.plus/api/2/get_node/pubkey={pubkey}",
+            timeout=8,
+        )
+        return r.json() if r.status_code == 200 else {}
+    except Exception:
+        return {}
+
+
+def _score_pool_node(node: dict, our_pubkey: str, our_peers: set):
+    pubkey = node.get("pubkey", "")
+    if pubkey == our_pubkey:
+        return None, 0, [], "Unknown"
+
+    a1 = (node.get("address_1") or "").lower()
+    a2 = (node.get("address_2") or "").lower()
+    has_clearnet = bool(a1 and ".onion" not in a1 and "@" in a1)
+    has_tor = ".onion" in a1 or ".onion" in a2
+    conn = "Both" if (has_clearnet and has_tor) else ("Clearnet" if has_clearnet else ("Tor" if has_tor else "Unknown"))
+
+    if pubkey in our_peers:
+        return "red", -50, ["Already your peer"], conn
+
+    if node.get("banned"):
+        return "red", -100, ["Banned by admin"], conn
+    if node.get("inactive"):
+        return "red", -100, ["Marked inactive"], conn
+
+    cap = node.get("capacity_sats") or node.get("capacity") or 0
+    channels = node.get("channels_count") or node.get("open_channels") or 0
+    min_ch = node.get("min_channel_size") or 0
+
+    if cap == 0:
+        return "red", -50, ["Zero capacity"], conn
+    if channels == 0:
+        return "red", -50, ["No public channels"], conn
+    if min_ch > OUR_MAX_CHANNEL_SAT:
+        return "red", -50, [f"Min channel {min_ch:,} sat — exceeds our 2M max"], conn
+
+    pos = node.get("positive_ratings_count") or node.get("lnp_positive_ratings_received") or 0
+    neg = node.get("negative_ratings_count") or node.get("lnp_negative_ratings_received") or 0
+    total = pos + neg
+    happy = round(pos / total * 100) if total > 0 else None
+    if happy is not None and happy < 50:
+        return "red", -50, [f"Only {happy}% happy ({total} ratings)"], conn
+
+    last_seen_str = node.get("last_seen_at") or node.get("lnp_updated_at") or ""
+    hours_ago = None
+    if last_seen_str:
+        try:
+            dt = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+            hours_ago = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+        except Exception:
+            pass
+    if hours_ago is not None and hours_ago > 168:
+        return "red", -50, [f"Last seen {int(hours_ago/24)}d ago"], conn
+
+    score = 0
+    reasons = []
+
+    if hours_ago is not None:
+        if hours_ago < 24:
+            score += 3; reasons.append(f"Online recently ({int(hours_ago)}h ago)")
+        elif hours_ago < 168:
+            score += 1; reasons.append(f"Last seen {int(hours_ago/24)}d ago")
+
+    if happy is not None and total >= 2:
+        if happy >= 80 and total >= 5:
+            score += 3; reasons.append(f"{happy}% happy · {total} ratings")
+        elif happy >= 60:
+            score += 1; reasons.append(f"{happy}% happy · {total} ratings")
+        else:
+            reasons.append(f"{happy}% happy · {total} ratings")
+    else:
+        reasons.append("New node — no rating history")
+
+    if channels >= 10:
+        score += 2; reasons.append(f"{channels:,} public channels")
+    elif channels >= 3:
+        score += 1; reasons.append(f"{channels} public channels")
+    else:
+        reasons.append(f"Only {channels} channels")
+
+    if has_clearnet and has_tor:
+        score += 2; reasons.append("Dual-stack clearnet + Tor")
+    elif has_clearnet:
+        score += 1; reasons.append("Clearnet only")
+    elif has_tor:
+        reasons.append("Tor only")
+
+    rank = node.get("lnplus_rank_number") or node.get("lnp_rank") or 0
+    rank_name = node.get("lnplus_rank_name") or node.get("lnp_rank_name") or ""
+    if rank >= 7:
+        score += 2; reasons.append(f"LN+ rank {rank} / {rank_name} — elite")
+    elif rank >= 5:
+        score += 1; reasons.append(f"LN+ rank {rank} / {rank_name}")
+    elif rank:
+        reasons.append(f"LN+ rank {rank} / {rank_name}")
+
+    if min_ch and min_ch <= 500_000:
+        score += 1; reasons.append(f"Min channel {min_ch:,} sat — fits our range")
+    elif min_ch:
+        reasons.append(f"Min channel {min_ch:,} sat")
+
+    rec = "green" if score >= 8 else "amber" if score >= 3 else "red"
+    return rec, score, reasons, conn
+
+
+@app.route("/api/pool")
+def api_pool():
+    now = _time.time()
+    if now - _pool_cache["ts"] < _POOL_TTL:
+        return jsonify({"nodes": _pool_cache["nodes"], "stats": _pool_cache["stats"], "cached": True})
+
+    try:
+        config = load_config()
+        lnd_ip = config["endpoints"]["lnd_grpc"].split(":")[0]
+        mac_path = config["credentials"]["lit_macaroon_path"]
+        tls_cert = config["credentials"].get("lnd_tls_cert_path")
+        lndg_base = config["endpoints"]["lndg_api"]
+        lndg_auth = HTTPBasicAuth(config["credentials"]["lndg_user"],
+                                  config["credentials"]["lndg_pass"])
+
+        with open(mac_path, "rb") as fh:
+            mac_hex = fh.read().hex()
+
+        info = requests.get(
+            f"https://{lnd_ip}:8080/v1/getinfo",
+            headers={"Grpc-Metadata-macaroon": mac_hex},
+            verify=tls_cert or False, timeout=8,
+        ).json()
+        our_pubkey = info.get("identity_pubkey", "")
+
+        chs = requests.get(f"{lndg_base}/api/channels/", auth=lndg_auth, timeout=10).json()
+        our_peers = {c["remote_pubkey"] for c in chs.get("results", []) if c.get("is_open")}
+
+        swaps = requests.get("https://lightningnetwork.plus/api/2/get_swaps", timeout=15).json()
+
+        # Collect unique participants from all swaps
+        seen: dict[str, dict] = {}
+        for swap in (swaps if isinstance(swaps, list) else []):
+            for p in swap.get("participants", []):
+                pk = p.get("pubkey")
+                if pk and pk not in seen:
+                    seen[pk] = p
+
+        # Enrich with get_node in parallel (for min_channel_size + full ratings)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as ex:
+            enriched = dict(ex.map(lambda pk: (pk, _lnplus_get_node(pk)), seen.keys()))
+
+        results = []
+        for pk, base in seen.items():
+            node = {**base, **(enriched.get(pk) or {})}
+            rec, score, reasons, conn = _score_pool_node(node, our_pubkey, our_peers)
+            if rec is None:
+                continue
+
+            pos = node.get("positive_ratings_count") or node.get("lnp_positive_ratings_received") or 0
+            neg = node.get("negative_ratings_count") or node.get("lnp_negative_ratings_received") or 0
+            total_r = pos + neg
+            happy = round(pos / total_r * 100) if total_r > 0 else None
+            cap_sats = node.get("capacity_sats") or node.get("capacity") or 0
+            channels = node.get("channels_count") or node.get("open_channels") or 0
+            rank = node.get("lnplus_rank_number") or node.get("lnp_rank") or 0
+            rank_name = node.get("lnplus_rank_name") or node.get("lnp_rank_name") or ""
+            min_ch = node.get("min_channel_size") or 0
+            last_seen = node.get("last_seen_at") or node.get("lnp_updated_at") or ""
+
+            results.append({
+                "pubkey": pk,
+                "alias": node.get("alias") or "Unknown",
+                "avatar": node.get("avatar") or "",
+                "capacity_btc": round(cap_sats / 1e8, 3),
+                "capacity_sats": cap_sats,
+                "channels": channels,
+                "happy_pct": happy,
+                "ratings_total": total_r,
+                "min_channel_sat": min_ch,
+                "rank": rank,
+                "rank_name": rank_name,
+                "conn_type": conn,
+                "last_seen_at": last_seen,
+                "recommendation": rec,
+                "score": score,
+                "reasons": reasons,
+                "lnplus_url": f"https://lightningnetwork.plus/nodes/{pk}",
+                "amboss_url": f"https://amboss.space/node/{pk}",
+            })
+
+        results.sort(key=lambda x: ({"green": 0, "amber": 1, "red": 2}[x["recommendation"]], -x["score"]))
+        stats = {k: sum(1 for r in results if r["recommendation"] == k) for k in ("green", "amber", "red")}
+        stats["total"] = len(results)
+
+        _pool_cache.update({"nodes": results, "stats": stats, "ts": now})
+        return jsonify({"nodes": results, "stats": stats, "cached": False})
+
+    except Exception as e:
+        if _pool_cache["ts"] > 0:
+            return jsonify({"nodes": _pool_cache["nodes"], "stats": _pool_cache["stats"], "cached": True, "stale": True})
+        return jsonify({"error": str(e), "nodes": [], "stats": {}}), 503
 
 
 _lnplus_cache: dict = {"count": 0, "notifications": [], "ts": 0.0}

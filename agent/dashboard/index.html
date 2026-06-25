@@ -176,6 +176,50 @@
   .scout-balance{font-size:11px;color:var(--text2);font-family:var(--mono);}
   .scout-filter{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-left:auto;}
   .scout-filter input{cursor:pointer;accent-color:var(--accent);}
+  /* Pool Browser */
+  .pool-stats-bar{display:flex;gap:18px;padding:10px 18px;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);}
+  .pool-stat-g{color:var(--green);} .pool-stat-a{color:var(--amber);} .pool-stat-r{color:var(--text3);}
+  .pool-toolbar{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border);}
+  .pool-search{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;}
+  .pool-search:focus{border-color:var(--accent);}
+  .pool-filter{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text2);font-size:12px;cursor:pointer;outline:none;}
+  .pool-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .pool-table thead th{padding:6px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
+  .pool-table thead th:hover{color:var(--text2);}
+  .pool-table thead th.sorted{color:var(--accent);}
+  .pool-table tbody tr{border-bottom:1px solid var(--border);cursor:default;transition:background .1s;}
+  .pool-table tbody tr:hover{background:var(--surface2);}
+  .pool-table td{padding:7px 10px;vertical-align:middle;}
+  .pool-avatar{width:26px;height:26px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text2);flex-shrink:0;overflow:hidden;}
+  .pool-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .pool-alias{font-weight:500;color:var(--text);cursor:pointer;}
+  .pool-alias:hover{color:var(--accent);text-decoration:underline;}
+  .pool-score{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;}
+  .pool-score.green{background:rgba(67,209,122,.15);color:var(--green);}
+  .pool-score.amber{background:rgba(245,166,35,.15);color:var(--amber);}
+  .pool-score.red{background:rgba(240,82,82,.08);color:var(--text3);}
+  .pool-conn{font-size:11px;color:var(--text2);}
+  .pool-conn.both{color:var(--green);}
+  .pool-conn.tor{color:var(--text3);}
+  .pool-actions{display:flex;gap:6px;}
+  .pool-action-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 8px;cursor:pointer;white-space:nowrap;}
+  .pool-action-btn:hover{background:var(--border2);color:var(--text);}
+  /* Pool hover tooltip reuses peer-tooltip but with extra fields */
+  .pool-tip-happy{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);}
+  .pool-tip-bar{flex:1;height:6px;border-radius:3px;background:var(--border2);overflow:hidden;}
+  .pool-tip-fill{height:100%;border-radius:3px;background:var(--green);}
+  .pool-tip-fill.amber{background:var(--amber);}
+  .pool-tip-fill.red{background:var(--red);}
+  /* Bookmarks pool card */
+  .bm-pool-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin:12px 18px;padding:14px 16px;}
+  .bm-pool-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .bm-pool-card-alias{font-weight:600;flex:1;cursor:pointer;}
+  .bm-pool-card-alias:hover{color:var(--accent);}
+  .bm-pool-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;margin-bottom:10px;}
+  .bm-pool-card-stat dt{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+  .bm-pool-card-stat dd{color:var(--text);font-family:var(--mono);font-size:12px;margin:0;}
+  .bm-pool-card-reason{font-size:11px;color:var(--text2);padding:6px 0;border-top:1px solid var(--border);margin-top:8px;}
+  .bm-pool-card-actions{display:flex;gap:8px;margin-top:8px;}
   .peer-alias-col{cursor:pointer;}
   .peer-alias-col:hover{color:var(--accent);text-decoration:underline;}
   .bookmark-btn{background:none;border:none;cursor:pointer;padding:2px 5px;color:var(--text3);flex-shrink:0;line-height:1;border-radius:4px;transition:color .15s;}
@@ -238,6 +282,11 @@
         Safety
       </div>
       <div class="nav-section">Discovery</div>
+      <div class="nav-item" data-view="pool" onclick="switchView('pool')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Pool Browser
+        <span class="nav-badge" id="pool-green-badge" style="display:none">0</span>
+      </div>
       <div class="nav-item" data-view="peerscout" onclick="switchView('peerscout')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         Peer Scout
@@ -501,6 +550,60 @@
       </div>
     </div><!-- /view-peerscout -->
 
+    <div class="view" id="view-pool">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            LN+ Liquidity Pool Browser
+          </span>
+          <span class="panel-action" onclick="refreshPool(true)">Refresh</span>
+        </div>
+        <div class="pool-stats-bar" id="pool-stats-bar">
+          <span class="pool-stat-g" id="pool-stat-g">– ✓ Rec</span>
+          <span class="pool-stat-a" id="pool-stat-a">– ~ Watch</span>
+          <span class="pool-stat-r" id="pool-stat-r">– ✗ Pass</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="pool-cache-note"></span>
+        </div>
+        <div class="pool-toolbar">
+          <input class="pool-search" id="pool-search" type="text" placeholder="Search node alias…" oninput="renderPoolTable()">
+          <select class="pool-filter" id="pool-filter" onchange="renderPoolTable()">
+            <option value="all">All nodes</option>
+            <option value="green">✓ Recommended only</option>
+            <option value="amber">~ Watch only</option>
+            <option value="red">✗ Pass only</option>
+          </select>
+          <select class="pool-filter" id="pool-conn-filter" onchange="renderPoolTable()">
+            <option value="all">All connections</option>
+            <option value="Both">Clearnet + Tor</option>
+            <option value="Clearnet">Clearnet only</option>
+            <option value="Tor">Tor only</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="pool-table">
+            <thead>
+              <tr>
+                <th style="width:30px"></th>
+                <th onclick="poolSort('alias')" id="ph-alias">Node ↕</th>
+                <th onclick="poolSort('capacity_btc')" id="ph-cap">Cap ↕</th>
+                <th onclick="poolSort('channels')" id="ph-ch">Ch ↕</th>
+                <th onclick="poolSort('happy_pct')" id="ph-happy">Happy ↕</th>
+                <th onclick="poolSort('min_channel_sat')" id="ph-min">Min Ch ↕</th>
+                <th onclick="poolSort('rank')" id="ph-rank">Rank ↕</th>
+                <th>Conn</th>
+                <th onclick="poolSort('last_seen_at')" id="ph-seen">Seen ↕</th>
+                <th onclick="poolSort('score')" id="ph-score" class="sorted">Score ↕</th>
+                <th style="width:32px"></th>
+              </tr>
+            </thead>
+            <tbody id="pool-tbody"></tbody>
+          </table>
+        </div>
+        <div id="pool-empty" class="empty-state" style="display:none">Loading pool nodes…</div>
+      </div>
+    </div><!-- /view-pool -->
+
     <div class="view" id="view-bookmarks">
       <div class="panel">
         <div class="panel-header">
@@ -736,7 +839,160 @@ async function refreshAll(){
   document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
 }
 
-// ── Peer Scout + Bookmarks ────────────────────────────────
+// ── Pool Browser ─────────────────────────────────────────
+let _poolData = [];
+let _poolSort = {key: 'score', asc: false};
+
+async function refreshPool(force) {
+  document.getElementById('pool-empty').style.display = '';
+  document.getElementById('pool-empty').textContent = 'Loading LN+ pool nodes… (first load enriches 60+ nodes, ~3s)';
+  document.getElementById('pool-tbody').innerHTML = '';
+  try {
+    const url = force ? '/api/pool?bust=' + Date.now() : '/api/pool';
+    const d = await fetchJSON(url);
+    _poolData = d.nodes || [];
+    const s = d.stats || {};
+    document.getElementById('pool-stat-g').textContent = `${s.green||0} ✓ Rec`;
+    document.getElementById('pool-stat-a').textContent = `${s.amber||0} ~ Watch`;
+    document.getElementById('pool-stat-r').textContent = `${s.red||0} ✗ Pass`;
+    document.getElementById('pool-cache-note').textContent = d.cached ? 'cached · refresh to reload' : `${_poolData.length} nodes`;
+    const badge = document.getElementById('pool-green-badge');
+    badge.textContent = s.green || 0;
+    badge.style.display = s.green ? '' : 'none';
+    document.getElementById('pool-empty').style.display = 'none';
+    renderPoolTable();
+  } catch(e) {
+    document.getElementById('pool-empty').textContent = 'Failed to load — ' + e.message;
+  }
+}
+
+function poolSort(key) {
+  if (_poolSort.key === key) { _poolSort.asc = !_poolSort.asc; }
+  else { _poolSort = {key, asc: key === 'alias'}; }
+  document.querySelectorAll('.pool-table thead th').forEach(th => th.classList.remove('sorted'));
+  const hid = {alias:'ph-alias',capacity_btc:'ph-cap',channels:'ph-ch',happy_pct:'ph-happy',min_channel_sat:'ph-min',rank:'ph-rank',last_seen_at:'ph-seen',score:'ph-score'}[key];
+  if (hid) document.getElementById(hid)?.classList.add('sorted');
+  renderPoolTable();
+}
+
+function renderPoolTable() {
+  const search = (document.getElementById('pool-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('pool-filter')?.value || 'all';
+  const connF = document.getElementById('pool-conn-filter')?.value || 'all';
+  let rows = _poolData.filter(n => {
+    if (filter !== 'all' && n.recommendation !== filter) return false;
+    if (connF !== 'all' && n.conn_type !== connF) return false;
+    if (search && !n.alias.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const {key, asc} = _poolSort;
+  rows.sort((a, b) => {
+    const recOrd = {green:0,amber:1,red:2};
+    if (key === 'score') return asc ? (a.score - b.score) : (b.score - a.score || recOrd[a.recommendation] - recOrd[b.recommendation]);
+    let av = a[key], bv = b[key];
+    if (av === null || av === undefined) av = asc ? Infinity : -Infinity;
+    if (bv === null || bv === undefined) bv = asc ? Infinity : -Infinity;
+    if (key === 'alias') return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    if (key === 'last_seen_at') { av = av||''; bv = bv||''; return asc ? av.localeCompare(bv) : bv.localeCompare(av); }
+    return asc ? av - bv : bv - av;
+  });
+  const tbody = document.getElementById('pool-tbody');
+  if (!rows.length) { tbody.innerHTML = ''; document.getElementById('pool-empty').style.display = ''; document.getElementById('pool-empty').textContent = 'No nodes match the current filter'; return; }
+  document.getElementById('pool-empty').style.display = 'none';
+  tbody.innerHTML = rows.map((n, i) => {
+    const bm = _bookmarkedPubkeys.has(n.pubkey);
+    const initials = n.alias.replace(/[^a-zA-Z0-9]/g,'').slice(0,2).toUpperCase() || '??';
+    const avatarEl = n.avatar
+      ? `<img src="${n.avatar}" alt="${initials}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+      : '';
+    const capStr = n.capacity_btc >= 1 ? n.capacity_btc.toFixed(2)+' BTC' : Math.round(n.capacity_sats/1000).toLocaleString()+'k';
+    const happyStr = n.happy_pct !== null ? `${n.happy_pct}% <span style="color:var(--text3)">(${n.ratings_total})</span>` : '<span style="color:var(--text3)">—</span>';
+    const minChStr = n.min_channel_sat ? (n.min_channel_sat/1000).toLocaleString()+'k' : '—';
+    const rankStr = n.rank ? `${n.rank}/${n.rank_name}` : '—';
+    const seenStr = _poolSeenStr(n.last_seen_at);
+    const scoreLabel = {green:'✓ Rec', amber:'~ Watch', red:'✗ Pass'}[n.recommendation];
+    const connClass = {Both:'both', Clearnet:'', Tor:'tor'}[n.conn_type]||'';
+    const starSvg = bm
+      ? `<svg viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+    return `<tr onmouseenter="showPoolTip(event,${_poolData.indexOf(n)})" onmousemove="movePeerTip(event)" onmouseleave="hidePeerTip()">
+      <td><button class="bookmark-btn ${bm?'active':''}" onclick="togglePoolBookmark(event,${_poolData.indexOf(n)})" title="${bm?'Remove':'Bookmark'}">${starSvg}</button></td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <div class="pool-avatar">${avatarEl}<span>${initials}</span></div>
+        <span class="pool-alias" onclick="window.open('${n.amboss_url}','_blank','noopener')">${n.alias}</span>
+      </div></td>
+      <td style="font-family:var(--mono);font-size:11px">${capStr}</td>
+      <td style="font-family:var(--mono)">${n.channels.toLocaleString()}</td>
+      <td>${happyStr}</td>
+      <td style="font-family:var(--mono);font-size:11px">${minChStr}</td>
+      <td style="font-size:11px;color:var(--text2)">${rankStr}</td>
+      <td><span class="pool-conn ${connClass}">${n.conn_type}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${seenStr}</td>
+      <td><span class="pool-score ${n.recommendation}">${scoreLabel}</span></td>
+      <td><button class="bookmark-btn" onclick="window.open('${n.lnplus_url}','_blank','noopener')" title="Open on LN+"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button></td>
+    </tr>`;
+  }).join('');
+}
+
+function _poolSeenStr(ts) {
+  if (!ts) return '—';
+  try {
+    const diff = (Date.now() - new Date(ts)) / 3600000;
+    if (diff < 1) return '<1h ago';
+    if (diff < 24) return `${Math.floor(diff)}h ago`;
+    return `${Math.floor(diff/24)}d ago`;
+  } catch { return '—'; }
+}
+
+function showPoolTip(e, idx) {
+  const n = _poolData[idx];
+  if (!n) return;
+  const happy = n.happy_pct !== null ? n.happy_pct : 0;
+  const fillClass = happy >= 80 ? '' : happy >= 60 ? 'amber' : 'red';
+  const scoreLabel = {green:'✓ RECOMMENDED — open a channel', amber:'~ WATCH — worth considering', red:'✗ PASS — not recommended'}[n.recommendation];
+  const recClass = n.recommendation;
+  document.getElementById('peer-tooltip').innerHTML = `
+    <div class="pt-head">
+      <div class="pt-alias">${n.alias}</div>
+      <div class="pt-pubkey">${n.pubkey.slice(0,10)}…${n.pubkey.slice(-10)}</div>
+    </div>
+    <div class="pool-tip-happy">
+      <span style="font-size:11px;color:var(--text2);width:80px">${n.happy_pct !== null ? n.happy_pct+'% happy' : 'No ratings'}</span>
+      <div class="pool-tip-bar"><div class="pool-tip-fill ${fillClass}" style="width:${happy}%"></div></div>
+      <span style="font-size:11px;color:var(--text3)">${n.ratings_total} ratings</span>
+    </div>
+    <div class="pt-stats">
+      <dl class="pt-stat"><dt>Capacity</dt><dd>${n.capacity_btc} BTC</dd></dl>
+      <dl class="pt-stat"><dt>Channels</dt><dd>${n.channels.toLocaleString()}</dd></dl>
+      <dl class="pt-stat"><dt>Min Ch</dt><dd>${n.min_channel_sat ? (n.min_channel_sat/1000).toLocaleString()+'k sat' : '—'}</dd></dl>
+      <dl class="pt-stat"><dt>Rank</dt><dd>${n.rank ? n.rank+'/'+n.rank_name : '—'}</dd></dl>
+      <dl class="pt-stat"><dt>Connection</dt><dd>${n.conn_type}</dd></dl>
+      <dl class="pt-stat"><dt>Last seen</dt><dd>${_poolSeenStr(n.last_seen_at)}</dd></dl>
+    </div>
+    <div class="pt-reasons">${(n.reasons||[]).map(r=>`<div class="pt-reason">${r}</div>`).join('')}</div>
+    <div class="pt-rec ${recClass}">${scoreLabel}</div>`;
+  document.getElementById('peer-tooltip').style.display = 'block';
+  movePeerTip(e);
+}
+
+async function togglePoolBookmark(e, idx) {
+  e.stopPropagation();
+  const n = _poolData[idx];
+  if (!n) return;
+  const wasBm = _bookmarkedPubkeys.has(n.pubkey);
+  if (wasBm) {
+    await fetch(`/api/bookmarks/${n.pubkey}`, {method:'DELETE'});
+    _bookmarkedPubkeys.delete(n.pubkey);
+  } else {
+    const payload = {...n, recommendation: n.recommendation, reasons: n.reasons};
+    await fetch('/api/bookmarks', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    _bookmarkedPubkeys.add(n.pubkey);
+  }
+  _updateBookmarkBadge();
+  renderPoolTable();
+}
+
+// ── Peer Scout + Bookmarks ─────────────────────────────────
 let _peerData = [];
 let _bookmarkedPubkeys = new Set();
 
@@ -954,6 +1210,7 @@ const _VIEW_META = {
   feepolicy:   ['Fee Policy',   'AF band changes by cycle'],
   connections: ['Connections',  'Backend health check'],
   safety:      ['Safety',       'SCB age and node health'],
+  pool:        ['Pool Browser', 'LN+ Liquidity Pool — scored against Seoul Node Runner state'],
   peerscout:   ['Peer Scout',   'Suggested nodes to open channels with — hover for details'],
   bookmarks:   ['Bookmarks',   'Saved peers — click name to open on Amboss'],
 };
@@ -969,7 +1226,7 @@ function switchView(name) {
   ({overview:refreshAll,channels:refreshChannelDetail,cyclelog:refreshCycleLog,
     approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
     feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety,
-    peerscout:refreshPeerScout,bookmarks:refreshBookmarks}
+    pool:refreshPool,peerscout:refreshPeerScout,bookmarks:refreshBookmarks}
   )[name]?.();
 }
 
