@@ -304,7 +304,7 @@ def api_agent_status():
         config = load_config()
         dry_run = config["agent"].get("dry_run", True)
         import subprocess
-        result = subprocess.run(["pgrep", "-f", "agent/main.py"], capture_output=True, text=True)
+        result = subprocess.run(["pgrep", "-f", "agent\\.main"], capture_output=True, text=True)
         running = result.returncode == 0
         return jsonify({
             "running": running,
@@ -314,6 +314,42 @@ def api_agent_status():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 503
+
+
+@app.route("/api/agent/start", methods=["POST"])
+def api_agent_start():
+    import subprocess as _sp
+    try:
+        chk = _sp.run(["pgrep", "-f", "agent\\.main"], capture_output=True, text=True)
+        if chk.returncode == 0:
+            return jsonify({"ok": True, "message": "Already running"})
+        proc = _sp.Popen(
+            ["python3", "-m", "agent.main"],
+            cwd=_REPO_ROOT,
+            stdout=_sp.DEVNULL,
+            stderr=_sp.DEVNULL,
+            start_new_session=True,
+        )
+        return jsonify({"ok": True, "pid": proc.pid})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/agent/stop", methods=["POST"])
+def api_agent_stop():
+    import subprocess as _sp, signal
+    try:
+        chk = _sp.run(["pgrep", "-f", "agent\\.main"], capture_output=True, text=True)
+        if chk.returncode != 0:
+            return jsonify({"ok": True, "message": "Not running"})
+        for pid in chk.stdout.strip().split("\n"):
+            try:
+                os.kill(int(pid.strip()), signal.SIGTERM)
+            except (ValueError, ProcessLookupError):
+                pass
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/approvals")
@@ -675,12 +711,30 @@ def api_peer_suggestions():
                 "score":        score,
             })
 
+        # Our on-chain balance (for fundability filter)
+        our_balance_sats = 0
+        try:
+            bal = requests.get(
+                f"https://{lnd_ip}:8080/v1/balance/blockchain",
+                headers={"Grpc-Metadata-macaroon": mac_hex},
+                verify=tls_cert or False, timeout=6,
+            ).json()
+            total = int(bal.get("confirmed_balance", 0))
+            reserved = int(bal.get("reserved_balance_anchor_chan", 0))
+            our_balance_sats = max(0, total - reserved)
+        except Exception:
+            pass
+
+        # Add avg channel size (proxy for min channel requirement)
+        for r in results:
+            r["avg_channel_sats"] = int(r["capacity_sats"] / max(1, r["channels"]))
+
         _ORDER = {"recommended": 0, "consider": 1, "skip": 2}
         results.sort(key=lambda x: (_ORDER[x["recommendation"]], -x["score"]))
         results = results[:50]
 
         _peer_suggestions_cache.update({"peers": results, "ts": now})
-        return jsonify({"peers": results, "cached": False})
+        return jsonify({"peers": results, "our_balance_sats": our_balance_sats, "cached": False})
 
     except Exception as e:
         if _peer_suggestions_cache["ts"] > 0:

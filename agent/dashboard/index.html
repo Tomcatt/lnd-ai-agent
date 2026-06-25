@@ -168,6 +168,14 @@
   .pt-rec.skip{color:var(--red);}
   .peer-list-header{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;}
   .peer-list-header .peer-ch-col,.peer-list-header .peer-cap-col,.peer-list-header .peer-loc-col{color:var(--text3);}
+  .btn-danger{background:var(--red);color:#fff;border-color:var(--red);}
+  .btn-danger:hover{opacity:.85;}
+  .btn-success{background:var(--green);color:#0a0d12;border-color:var(--green);}
+  .btn-success:hover{opacity:.85;}
+  .scout-header{display:flex;align-items:center;gap:12px;padding:8px 18px 0;}
+  .scout-balance{font-size:11px;color:var(--text2);font-family:var(--mono);}
+  .scout-filter{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-left:auto;}
+  .scout-filter input{cursor:pointer;accent-color:var(--accent);}
   .peer-alias-col{cursor:pointer;}
   .peer-alias-col:hover{color:var(--accent);text-decoration:underline;}
   .bookmark-btn{background:none;border:none;cursor:pointer;padding:2px 5px;color:var(--text3);flex-shrink:0;line-height:1;border-radius:4px;transition:color .15s;}
@@ -255,6 +263,8 @@
       <div class="topbar-actions">
         <span class="refresh-badge" id="last-refresh">–</span>
         <button class="btn" onclick="refreshAll()">Refresh now</button>
+        <button class="btn btn-danger" id="agent-stop-btn" style="display:none" onclick="agentStop()">■ Stop agent</button>
+        <button class="btn btn-success" id="agent-start-btn" style="display:none" onclick="agentStart()">▶ Start agent</button>
         <button class="btn btn-primary" id="mode-btn" onclick="toggleMode()">Go live</button>
         <div class="bell-wrap" id="bell-wrap" tabindex="0" title="LND+ messages"
              onclick="bellCtxOpen(event)" oncontextmenu="bellCtxOpen(event)"
@@ -472,12 +482,20 @@
           </span>
           <span class="panel-action" onclick="refreshPeerScout()">Refresh</span>
         </div>
+        <div class="scout-header">
+          <span class="scout-balance" id="scout-balance"></span>
+          <label class="scout-filter">
+            <input type="checkbox" id="scout-filter-fundable" onchange="applyScoutFilter()">
+            Hide nodes I can't fund
+          </label>
+        </div>
         <div class="peer-list-header">
           <div style="width:9px;flex-shrink:0"></div>
           <div style="flex:1">Node</div>
           <div class="peer-ch-col">Ch</div>
           <div class="peer-cap-col">Capacity</div>
           <div class="peer-loc-col">Location</div>
+          <div style="width:28px;flex-shrink:0"></div>
         </div>
         <div id="peerscout-list"><div class="empty-state">Loading...</div></div>
       </div>
@@ -558,10 +576,30 @@ async function refreshStatus(){
     if(d.dry_run){btn.textContent='Go live';btn.className='btn btn-primary';}
     else{btn.textContent='● Live';btn.className='btn btn-live';}
     document.getElementById('topbar-sub').textContent=`Mode: ${d.mode} · Cycle every ${d.cycle_interval_minutes} min`;
+    document.getElementById('agent-start-btn').style.display=d.running?'none':'';
+    document.getElementById('agent-stop-btn').style.display=d.running?'':'none';
   }catch(e){
     document.getElementById('agent-status-text').textContent='Cannot reach server';
     document.getElementById('agent-dot').className='status-dot offline';
+    document.getElementById('agent-start-btn').style.display='none';
+    document.getElementById('agent-stop-btn').style.display='none';
   }
+}
+
+async function agentStart(){
+  const btn=document.getElementById('agent-start-btn');
+  btn.disabled=true; btn.textContent='Starting…';
+  try{ await fetch('/api/agent/start',{method:'POST'}); }catch(e){}
+  setTimeout(refreshStatus, 1500);
+  btn.disabled=false; btn.textContent='▶ Start agent';
+}
+
+async function agentStop(){
+  const btn=document.getElementById('agent-stop-btn');
+  btn.disabled=true; btn.textContent='Stopping…';
+  try{ await fetch('/api/agent/stop',{method:'POST'}); }catch(e){}
+  setTimeout(refreshStatus, 1500);
+  btn.disabled=false; btn.textContent='■ Stop agent';
 }
 
 async function refreshStats(){
@@ -724,19 +762,36 @@ function _peerRow(p, i, source) {
   </div>`;
 }
 
+let _ourBalanceSats = 0;
+
 async function refreshPeerScout() {
   const container = document.getElementById('peerscout-list');
   container.innerHTML = '<div class="empty-state">Scanning network...</div>';
   try {
     const [d, bm] = await Promise.all([fetchJSON('/api/peers/suggestions'), fetchJSON('/api/bookmarks')]);
     _peerData = d.peers || [];
+    _ourBalanceSats = d.our_balance_sats || 0;
     _bookmarkedPubkeys = new Set((bm.bookmarks || []).map(b => b.pubkey));
     _updateBookmarkBadge();
-    if (!_peerData.length) { container.innerHTML = '<div class="empty-state">No suggestions found</div>'; return; }
-    container.innerHTML = _peerData.map((p, i) => _peerRow(p, i, 'scout')).join('');
+    const balEl = document.getElementById('scout-balance');
+    if (_ourBalanceSats) balEl.textContent = `Our on-chain balance: ${_ourBalanceSats.toLocaleString()} sats`;
+    applyScoutFilter();
   } catch(e) {
     container.innerHTML = '<div class="empty-state">Failed to load — ' + e.message + '</div>';
   }
+}
+
+function applyScoutFilter() {
+  const container = document.getElementById('peerscout-list');
+  const filterOn = document.getElementById('scout-filter-fundable')?.checked;
+  const visible = filterOn && _ourBalanceSats
+    ? _peerData.filter(p => (p.avg_channel_sats || 0) <= _ourBalanceSats)
+    : _peerData;
+  if (!visible.length) {
+    container.innerHTML = '<div class="empty-state">' + (filterOn ? 'All nodes filtered out — try unchecking the filter' : 'No suggestions found') + '</div>';
+    return;
+  }
+  container.innerHTML = visible.map((p, i) => _peerRow(p, _peerData.indexOf(p), 'scout')).join('');
 }
 
 async function refreshBookmarks() {
