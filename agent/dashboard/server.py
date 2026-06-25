@@ -438,10 +438,52 @@ def api_connections():
         except Exception as e:
             return {"ok": False, "ms": None, "error": str(e)[:80]}
 
+    # LND REST needs macaroon header
+    try:
+        mac_path = config["credentials"]["lit_macaroon_path"]
+        tls_cert = config["credentials"].get("lnd_tls_cert_path")
+        with open(mac_path, "rb") as fh:
+            mac_hex = fh.read().hex()
+        lnd_ip = ep["lnd_grpc"].split(":")[0]
+        lnd_url = f"https://{lnd_ip}:8080"
+    except Exception:
+        mac_hex, tls_cert, lnd_url = "", None, ""
+
+    def probe_lnd():
+        if not lnd_url:
+            return {"ok": False, "ms": None, "error": "macaroon not loaded"}
+        try:
+            t0 = _time.time()
+            r = requests.get(f"{lnd_url}/v1/getinfo",
+                             headers={"Grpc-Metadata-macaroon": mac_hex},
+                             verify=tls_cert or False, timeout=5)
+            ms = round((_time.time() - t0) * 1000)
+            alias = r.json().get("alias", "") if r.ok else ""
+            return {"ok": r.ok, "ms": ms, "detail": alias or lnd_url}
+        except Exception as e:
+            return {"ok": False, "ms": None, "error": str(e)[:80]}
+
+    def probe_thunderhub():
+        try:
+            t0 = _time.time()
+            r = requests.post(
+                ep["thunderhub_graphql"],
+                json={"query": "{ getNodeInfo { alias } }"},
+                timeout=5,
+            )
+            ms = round((_time.time() - t0) * 1000)
+            ok = r.ok and "data" in r.json()
+            alias = (r.json().get("data") or {}).get("getNodeInfo", {}).get("alias", "") if ok else ""
+            return {"ok": ok, "ms": ms, "detail": alias or ep["thunderhub_graphql"]}
+        except Exception as e:
+            return {"ok": False, "ms": None, "error": str(e)[:80]}
+
     results = {
-        "lndg":    {**probe(f"{ep['lndg_api']}/api/channels/", auth=auth),  "label": "LNDg",     "detail": ep["lndg_api"]},
-        "mempool": {**probe(f"{ep['mempool_api']}/api/v1/fees/recommended"), "label": "Mempool",  "detail": ep["mempool_api"]},
-        "albyhub": {**probe(f"{ep['albyhub_api']}/api/version"),             "label": "Alby Hub", "detail": ep["albyhub_api"]},
+        "lnd":        {**probe_lnd(),                                                "label": "LND REST"},
+        "lndg":       {**probe(f"{ep['lndg_api']}/api/channels/", auth=auth),       "label": "LNDg",       "detail": ep["lndg_api"]},
+        "mempool":    {**probe(f"{ep['mempool_api']}/api/v1/fees/recommended"),      "label": "Mempool",    "detail": ep["mempool_api"]},
+        "thunderhub": {**probe_thunderhub(),                                         "label": "ThunderHub"},
+        "albyhub":    {**probe(f"{ep['albyhub_api']}/api/version"),                 "label": "Alby Hub",   "detail": ep["albyhub_api"]},
     }
     if _SCB_PATH.exists():
         age_h = round((_time.time() - _SCB_PATH.stat().st_mtime) / 3600, 1)
