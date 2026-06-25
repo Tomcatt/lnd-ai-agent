@@ -29,6 +29,7 @@ class RebalanceAction:
     def execute(self, data: dict) -> dict:
         chan_id = data.get("chan_id")
         peer_alias = data.get("peer_alias", "unknown")
+        peer_pubkey = data.get("peer_pubkey", "")
         local_pct = data.get("local_balance_pct", 50)
         capacity = data.get("capacity_sats", 0)
         local_sats = data.get("local_balance_sats", 0)
@@ -59,7 +60,7 @@ class RebalanceAction:
             log.info(f"Critical imbalance on {peer_alias} ({local_pct}%) — "
                      f"firing one-shot rebalancer")
             oneshot = self._fire_oneshot(
-                chan_id, peer_alias, local_pct, capacity, local_sats
+                chan_id, peer_alias, peer_pubkey, local_pct, capacity, local_sats
             )
             result["oneshot"] = oneshot
 
@@ -91,7 +92,7 @@ class RebalanceAction:
             log.error(f"AR target update failed for {peer_alias}: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def _fire_oneshot(self, chan_id, peer_alias, local_pct,
+    def _fire_oneshot(self, chan_id, peer_alias, peer_pubkey, local_pct,
                       capacity, local_sats) -> dict:
         target = capacity // 2
         value = abs(local_sats - target)
@@ -108,7 +109,7 @@ class RebalanceAction:
             payload = {
                 "value": value,
                 "fee_limit": int(value * 0.001),
-                "last_hop_pubkey": "",
+                "last_hop_pubkey": peer_pubkey,
                 "target_alias": peer_alias,
                 "duration": 5,
                 "manual": True,
