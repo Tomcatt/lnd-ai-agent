@@ -67,6 +67,8 @@
   .log-level.ERROR{color:var(--red);}
   .log-level.AUTO{color:var(--green);}
   .log-level.GATE{color:var(--purple);}
+  .log-level.CYCLE{color:var(--text3);font-style:italic;}
+  .log-level.ERROR{color:var(--red);}
   .log-msg{color:var(--text);flex:1;}
   .ch-table{width:100%;border-collapse:collapse;}
   .ch-table th{text-align:left;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:10px 18px;border-bottom:1px solid var(--border);}
@@ -104,6 +106,44 @@
   ::-webkit-scrollbar{width:4px;}
   ::-webkit-scrollbar-track{background:transparent;}
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+  .ctx-menu{position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:4px 0;min-width:210px;box-shadow:0 8px 28px rgba(0,0,0,.6);z-index:1000;display:none;}
+  .ctx-menu.open{display:block;}
+  .ctx-label{padding:7px 14px 4px;font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px;}
+  .ctx-item{display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;}
+  .ctx-item:hover{background:var(--surface2);color:var(--accent);}
+  .ctx-item svg{width:13px;height:13px;color:var(--text2);flex-shrink:0;}
+  .ctx-item:hover svg{color:var(--accent);}
+  .ctx-sep{height:1px;background:var(--border);margin:4px 0;}
+  .peer-name{cursor:context-menu;}
+  .ch-panel-body{overflow-y:auto;max-height:320px;}
+  .ch-table thead th{position:sticky;top:0;background:var(--surface);z-index:1;}
+  .th-sort{cursor:pointer;user-select:none;}
+  .th-sort:hover{color:var(--text);}
+  .th-sort::after{margin-left:5px;font-size:9px;color:var(--text3);}
+  .th-sort.asc::after{content:'▲';color:var(--accent);}
+  .th-sort.desc::after{content:'▼';color:var(--accent);}
+  .th-sort:not(.asc):not(.desc)::after{content:'⇅';}
+  .conn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+  .conn-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden;}
+  .conn-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .conn-card.ok::before{background:var(--green);}
+  .conn-card.err::before{background:var(--red);}
+  .conn-label{font-size:13px;font-weight:600;color:var(--text);}
+  .conn-status{font-size:11px;font-family:var(--mono);}
+  .conn-status.ok{color:var(--green);}
+  .conn-status.err{color:var(--red);}
+  .conn-detail{font-size:11px;color:var(--text2);font-family:var(--mono);}
+  .conn-ms{font-size:11px;color:var(--text3);font-family:var(--mono);}
+  .cycle-row{display:grid;grid-template-columns:44px 152px 52px 1fr;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);align-items:start;font-size:12px;}
+  .cycle-row:last-child{border-bottom:none;}
+  .cycle-actions div{font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:2px;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .topbar-actions{display:flex;align-items:center;gap:10px;}
+  .bell-wrap{position:relative;cursor:pointer;padding:7px;border-radius:7px;transition:background .15s;display:flex;align-items:center;justify-content:center;color:var(--text2);}
+  .bell-wrap:hover,.bell-wrap:focus{background:var(--surface2);color:var(--text);outline:none;}
+  .bell-wrap svg{width:18px;height:18px;}
+  .bell-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:var(--mono);line-height:1;border:2px solid var(--bg);pointer-events:none;}
 </style>
 </head>
 <body>
@@ -120,38 +160,38 @@
     </div>
     <nav>
       <div class="nav-section">Monitor</div>
-      <div class="nav-item active">
+      <div class="nav-item active" data-view="overview" onclick="switchView('overview')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         Overview
       </div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="channels" onclick="switchView('channels')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         Channels
       </div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="cyclelog" onclick="switchView('cyclelog')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Cycle Log
       </div>
       <div class="nav-section">Decisions</div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="approvals" onclick="switchView('approvals')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
         Approvals
         <span class="nav-badge" id="approval-badge" style="display:none">0</span>
       </div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="rebalancing" onclick="switchView('rebalancing')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Rebalancing
       </div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="feepolicy" onclick="switchView('feepolicy')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         Fee Policy
       </div>
       <div class="nav-section">System</div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="connections" onclick="switchView('connections')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
         Connections
       </div>
-      <div class="nav-item">
+      <div class="nav-item" data-view="safety" onclick="switchView('safety')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Safety
       </div>
@@ -172,10 +212,20 @@
         <span class="refresh-badge" id="last-refresh">–</span>
         <button class="btn" onclick="refreshAll()">Refresh now</button>
         <button class="btn btn-primary" id="mode-btn" onclick="toggleMode()">Go live</button>
+        <div class="bell-wrap" id="bell-wrap" tabindex="0" title="LND+ messages"
+             onclick="bellCtxOpen(event)" oncontextmenu="bellCtxOpen(event)"
+             onkeydown="if(event.key==='Enter'||event.key===' ')bellCtxOpen(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="bell-badge" id="bell-badge" style="display:none">0</span>
+        </div>
       </div>
     </div>
 
     <div class="content">
+    <div class="view active" id="view-overview">
       <div class="stats-grid">
         <div class="stat-card green">
           <div class="stat-label">Routing revenue · 7d</div>
@@ -212,12 +262,19 @@
             </div>
             <span class="panel-action" onclick="refreshChannels()">Refresh →</span>
           </div>
+          <div class="ch-panel-body">
           <table class="ch-table">
-            <thead><tr><th>Peer</th><th>Balance</th><th>Local %</th><th>Status</th></tr></thead>
+            <thead><tr>
+              <th class="th-sort" data-col="alias">Peer</th>
+              <th class="th-sort" data-col="local_balance">Balance</th>
+              <th class="th-sort" data-col="local_pct">Local %</th>
+              <th class="th-sort" data-col="status">Status</th>
+            </tr></thead>
             <tbody id="channel-tbody">
               <tr><td colspan="4" class="empty-state">Loading channels...</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:14px;">
@@ -261,7 +318,136 @@
           <div class="empty-state">Loading log...</div>
         </div>
       </div>
-    </div>
+    </div><!-- /view-overview -->
+
+    <div class="view" id="view-channels">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Open Channels · Full Detail
+          </div>
+          <span class="panel-action" onclick="refreshChannelDetail()">Refresh →</span>
+        </div>
+        <div class="ch-panel-body" style="max-height:600px">
+          <table class="ch-table">
+            <thead><tr><th>Peer</th><th>Capacity</th><th>Local</th><th>Remote</th><th>Local %</th><th>AR / AF</th><th>Out %</th><th>In %</th><th>Fee PPM</th><th>Status</th></tr></thead>
+            <tbody id="ch-detail-tbody"><tr><td colspan="10" class="empty-state">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /view-channels -->
+
+    <div class="view" id="view-cyclelog">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Cycle Log
+          </div>
+          <span class="panel-action" onclick="refreshCycleLog()">Refresh →</span>
+        </div>
+        <div id="cyclelog-container" style="max-height:600px;overflow-y:auto">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div><!-- /view-cyclelog -->
+
+    <div class="view" id="view-approvals">
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+            Pending Approvals
+          </div>
+        </div>
+        <div id="approvals-view-pending"><div class="empty-state">No pending approvals</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Resolved History</div>
+        </div>
+        <div id="approvals-view-history"><div class="empty-state">No history yet</div></div>
+      </div>
+    </div><!-- /view-approvals -->
+
+    <div class="view" id="view-rebalancing">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Rebalance History
+          </div>
+          <span class="panel-action" onclick="refreshRebalancingHistory()">Refresh →</span>
+        </div>
+        <div id="rebalancing-container" style="max-height:600px;overflow-y:auto">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div><!-- /view-rebalancing -->
+
+    <div class="view" id="view-feepolicy">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Fee Policy History
+          </div>
+          <span class="panel-action" onclick="refreshFeePolicyHistory()">Refresh →</span>
+        </div>
+        <div id="feepolicy-container" style="max-height:600px;overflow-y:auto">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div><!-- /view-feepolicy -->
+
+    <div class="view" id="view-connections">
+      <div class="conn-grid" id="connections-container">
+        <div class="empty-state">Loading...</div>
+      </div>
+    </div><!-- /view-connections -->
+
+    <div class="view" id="view-safety">
+      <div class="stats-grid" id="safety-stats">
+        <div class="empty-state" style="grid-column:1/-1">Loading...</div>
+      </div>
+    </div><!-- /view-safety -->
+
+    </div><!-- /content -->
+  </div>
+</div>
+
+<div class="ctx-menu" id="bell-ctx-menu">
+  <div class="ctx-label" id="bell-ctx-label">LND+ Messages</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="bell-ctx-open">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    Open LND+ inbox
+  </div>
+  <div class="ctx-item" onclick="refreshBell();closeBellCtx()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    Refresh count
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctx-menu">
+  <div class="ctx-label" id="ctx-label">node</div>
+  <div class="ctx-item" id="ctx-copy">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copy node ID
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctx-amboss">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    View on Amboss
+  </div>
+  <div class="ctx-item" id="ctx-mempool">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    View on mempool.space
+  </div>
+  <div class="ctx-item" id="ctx-1ml">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    View on 1ML
   </div>
 </div>
 
@@ -296,27 +482,61 @@ async function refreshStats(){
   }catch(e){document.getElementById('stat-revenue').textContent='err';}
 }
 
+let _chData=[], _chSort={col:null,dir:1};
+
+function _statusRank(ch){
+  if(!ch.is_active) return 0;
+  if(ch.local_pct<20||ch.local_pct>80) return 1;
+  return 2;
+}
+
+function renderChannelRows(){
+  const tbody=document.getElementById('channel-tbody');
+  if(!_chData.length){tbody.innerHTML='<tr><td colspan="4" class="empty-state">No channels found</td></tr>';return;}
+  const rows=[..._chData];
+  if(_chSort.col){
+    rows.sort((a,b)=>{
+      let av,bv;
+      if(_chSort.col==='alias'){av=a.alias.toLowerCase();bv=b.alias.toLowerCase();}
+      else if(_chSort.col==='status'){av=_statusRank(a);bv=_statusRank(b);}
+      else{av=a[_chSort.col]??0;bv=b[_chSort.col]??0;}
+      return av<bv?-_chSort.dir:av>bv?_chSort.dir:0;
+    });
+  }
+  tbody.innerHTML=rows.map(ch=>{
+    const pct=ch.local_pct;
+    const col=ch.bal_status==='ok'?'green':ch.bal_status==='low'?'amber':'red';
+    const tag=ch.is_active
+      ?(pct<20||pct>80?'<span class="tag warn">imbalanced</span>':'<span class="tag idle">idle</span>')
+      :'<span class="tag offline">offline</span>';
+    return `<tr>
+      <td><div class="peer-name" data-alias="${ch.alias}" data-pubkey="${ch.full_pubkey}">${ch.alias}</div><div class="peer-alias">${ch.pubkey}</div></td>
+      <td><div class="bal-bar"><div class="bal-fill ${ch.bal_status}" style="width:${Math.min(pct,100)}%"></div></div></td>
+      <td style="font-family:var(--mono);color:var(--${col})">${pct}%</td>
+      <td>${tag}</td></tr>`;
+  }).join('');
+}
+
 async function refreshChannels(){
   try{
     const d=await fetchJSON('/api/channels');
     document.getElementById('stat-channels').textContent=d.active;
     document.getElementById('stat-channels-sub').textContent=`${d.imbalanced} imbalanced · ${d.total-d.active} inactive`;
-    const tbody=document.getElementById('channel-tbody');
-    if(!d.channels.length){tbody.innerHTML='<tr><td colspan="4" class="empty-state">No channels found</td></tr>';return;}
-    tbody.innerHTML=d.channels.slice(0,8).map(ch=>{
-      const pct=ch.local_pct;
-      const col=ch.bal_status==='ok'?'green':ch.bal_status==='low'?'amber':'red';
-      const tag=ch.is_active
-        ?(pct<20||pct>80?'<span class="tag warn">imbalanced</span>':'<span class="tag idle">idle</span>')
-        :'<span class="tag offline">offline</span>';
-      return `<tr>
-        <td><div class="peer-name">${ch.alias}</div><div class="peer-alias">${ch.pubkey}</div></td>
-        <td><div class="bal-bar"><div class="bal-fill ${ch.bal_status}" style="width:${Math.min(pct,100)}%"></div></div></td>
-        <td style="font-family:var(--mono);color:var(--${col})">${pct}%</td>
-        <td>${tag}</td></tr>`;
-    }).join('');
+    _chData=d.channels;
+    renderChannelRows();
   }catch(e){document.getElementById('channel-tbody').innerHTML='<tr><td colspan="4" class="empty-state">Cannot reach LNDg</td></tr>';}
 }
+
+document.querySelectorAll('.th-sort').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const col=th.dataset.col;
+    if(_chSort.col===col){_chSort.dir*=-1;}
+    else{_chSort={col,dir:1};}
+    document.querySelectorAll('.th-sort').forEach(t=>t.classList.remove('asc','desc'));
+    th.classList.add(_chSort.dir===1?'asc':'desc');
+    renderChannelRows();
+  });
+});
 
 async function refreshMempool(){
   try{
@@ -379,8 +599,286 @@ async function refreshAll(){
   document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
 }
 
+// ── LND+ bell ─────────────────────────────────────────────
+let _bellCount = 0;
+let _bellNotifs = [];
+
+async function refreshBell() {
+  try {
+    const d = await fetchJSON('/api/lndplus/messages');
+    _bellCount = d.count || 0;
+    _bellNotifs = d.notifications || [];
+    const badge = document.getElementById('bell-badge');
+    const wrap  = document.getElementById('bell-wrap');
+    if (_bellCount > 0) {
+      badge.textContent = _bellCount > 99 ? '99+' : _bellCount;
+      badge.style.display = '';
+      wrap.title = `${_bellCount} notification${_bellCount !== 1 ? 's' : ''} on LightningNetwork+`;
+    } else {
+      badge.style.display = 'none';
+      wrap.title = 'LightningNetwork+ — no new notifications';
+    }
+  } catch(e) {
+    document.getElementById('bell-wrap').title = 'LightningNetwork+ unavailable';
+  }
+}
+
+function bellCtxOpen(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeBellCtx();
+  const menu = document.getElementById('bell-ctx-menu');
+  const label = document.getElementById('bell-ctx-label');
+  const openBtn = document.getElementById('bell-ctx-open');
+
+  label.textContent = _bellCount > 0
+    ? `${_bellCount} notification${_bellCount !== 1 ? 's' : ''}`
+    : 'No new notifications';
+
+  // Inject up to 3 notification previews before the separator
+  const existing = menu.querySelectorAll('.bell-notif-item');
+  existing.forEach(el => el.remove());
+  const sep = menu.querySelector('.ctx-sep');
+  _bellNotifs.slice(0, 3).forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'ctx-item bell-notif-item';
+    div.style.cssText = 'flex-direction:column;align-items:flex-start;gap:2px;';
+    div.innerHTML = `<span style="font-size:10px;color:var(--accent);font-family:var(--mono)">${n.type}</span>
+      <span style="white-space:normal;line-height:1.4;max-width:220px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${n.body}</span>`;
+    div.onclick = () => { window.open(n.url, '_blank', 'noopener'); closeBellCtx(); };
+    menu.insertBefore(div, sep);
+  });
+
+  openBtn.onclick = () => { window.open('https://lightningnetwork.plus/messages', '_blank', 'noopener'); closeBellCtx(); };
+
+  const rect = e.target.closest('#bell-wrap')?.getBoundingClientRect() || {right:0,bottom:0};
+  const x = Math.min(e.clientX || rect.right - 200, window.innerWidth - 260);
+  const y = e.clientY || rect.bottom + 4;
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  menu.style.display = 'block';
+}
+
+function closeBellCtx() {
+  document.getElementById('bell-ctx-menu').style.display = 'none';
+}
+
+// ── View switching ────────────────────────────────────────
+const _VIEW_META = {
+  overview:    ['Overview',     'Node summary · live'],
+  channels:    ['Channels',     'Open channels with AR settings'],
+  cyclelog:    ['Cycle Log',    'Agent run history'],
+  approvals:   ['Approvals',    'Pending and resolved decisions'],
+  rebalancing: ['Rebalancing',  'Rebalance job history'],
+  feepolicy:   ['Fee Policy',   'AF band changes by cycle'],
+  connections: ['Connections',  'Backend health check'],
+  safety:      ['Safety',       'SCB age and node health'],
+};
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(n =>
+    n.classList.toggle('active', n.dataset.view === name));
+  const [title, sub] = _VIEW_META[name] || [name, ''];
+  document.querySelector('.topbar-title').textContent = title;
+  document.getElementById('topbar-sub').textContent = sub;
+  ({overview:refreshAll,channels:refreshChannelDetail,cyclelog:refreshCycleLog,
+    approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
+    feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety}
+  )[name]?.();
+}
+
+async function refreshChannelDetail() {
+  const tbody = document.getElementById('ch-detail-tbody');
+  try {
+    const d = await fetchJSON('/api/channels/detail');
+    if (!d.channels.length) { tbody.innerHTML='<tr><td colspan="10" class="empty-state">No open channels</td></tr>'; return; }
+    tbody.innerHTML = d.channels.map(ch => {
+      const pct = ch.local_pct;
+      const col = pct>=20&&pct<=80?'green':pct<10?'red':'amber';
+      const arTag = ch.auto_rebalance?'<span class="tag auto">AR</span>':'<span class="tag idle">AR off</span>';
+      const afTag = ch.auto_fees?' <span class="tag auto">AF</span>':' <span class="tag idle">AF off</span>';
+      const status = ch.is_active?'<span class="tag auto">active</span>':'<span class="tag offline">inactive</span>';
+      return `<tr>
+        <td><div class="peer-name" data-alias="${ch.alias}" data-pubkey="${ch.full_pubkey}">${ch.alias}</div></td>
+        <td style="font-family:var(--mono)">${(ch.capacity/1000).toFixed(0)}k</td>
+        <td style="font-family:var(--mono)">${ch.local_balance.toLocaleString()}</td>
+        <td style="font-family:var(--mono)">${ch.remote_balance.toLocaleString()}</td>
+        <td style="font-family:var(--mono);color:var(--${col})">${pct}%</td>
+        <td>${arTag}${afTag}</td>
+        <td style="font-family:var(--mono)">${ch.ar_out_target}%</td>
+        <td style="font-family:var(--mono)">${ch.ar_in_target}%</td>
+        <td style="font-family:var(--mono)">${ch.local_fee_rate}</td>
+        <td>${status}</td></tr>`;
+    }).join('');
+  } catch(e) { tbody.innerHTML='<tr><td colspan="10" class="empty-state">Cannot reach LNDg</td></tr>'; }
+}
+
+async function refreshCycleLog() {
+  const el = document.getElementById('cyclelog-container');
+  try {
+    const d = await fetchJSON('/api/cyclelog');
+    if (!d.cycles.length) { el.innerHTML='<div class="empty-state">No cycle history yet</div>'; return; }
+    el.innerHTML = d.cycles.map(c => `<div class="cycle-row">
+      <div style="font-family:var(--mono);font-weight:700;color:var(--accent)">#${c.num}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text2)">${c.started}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${c.duration!=null?c.duration.toFixed(1)+'s':'–'}</div>
+      <div class="cycle-actions">${c.actions.length?c.actions.map(a=>`<div>${a}</div>`).join(''):'<span style="color:var(--text3)">no actions</span>'}</div>
+    </div>`).join('');
+  } catch(e) { el.innerHTML='<div class="empty-state">Log unavailable</div>'; }
+}
+
+async function refreshApprovalsView() {
+  try {
+    const d = await fetchJSON('/api/approvals');
+    const approvals = d.approvals||[];
+    const pending = document.getElementById('approvals-view-pending');
+    const history = document.getElementById('approvals-view-history');
+    pending.innerHTML = approvals.length
+      ? approvals.map(a=>`<div class="approval-card">
+          <div class="approval-title">${a.summary}</div>
+          <div class="approval-meta">${a.meta||''}<br>Expires: ${a.expires_at||'–'}</div>
+          <div class="approval-actions">
+            <button class="btn-approve" onclick="respond('${a.id}','APPROVE')">APPROVE</button>
+            <button class="btn-reject" onclick="respond('${a.id}','REJECT')">REJECT</button>
+            <button class="btn-snooze" onclick="respond('${a.id}','SNOOZE_7_DAYS')">snooze 7d</button>
+          </div></div>`).join('')
+      : '<div class="empty-state">No pending approvals</div>';
+    history.innerHTML='<div class="empty-state">Response history not yet implemented</div>';
+  } catch(e) { document.getElementById('approvals-view-pending').innerHTML='<div class="empty-state">Unavailable</div>'; }
+}
+
+async function refreshRebalancingHistory() {
+  const el = document.getElementById('rebalancing-container');
+  try {
+    const d = await fetchJSON('/api/rebalancing/history');
+    if (!d.events.length) { el.innerHTML='<div class="empty-state">No rebalancing history yet</div>'; return; }
+    el.innerHTML = `<table class="ch-table"><thead><tr>
+      <th>Time</th><th>Channel</th><th>Action</th><th>Detail</th>
+    </tr></thead><tbody>${d.events.map(e=>{
+      const tag = e.type==='oneshot'?'<span class="tag warn">One-shot</span>'
+                : e.type==='ar_update'?'<span class="tag auto">AR update</span>'
+                : '<span class="tag idle">–</span>';
+      const detail = e.type==='oneshot'?`${(e.sats||0).toLocaleString()} sats`
+                   : e.type==='ar_update'?`out=${e.out}% in=${e.inn}%`
+                   : e.msg||'–';
+      return `<tr>
+        <td style="font-family:var(--mono);color:var(--text2)">${e.ts.slice(11)}</td>
+        <td class="peer-name">${e.alias||'–'}</td>
+        <td>${tag}</td>
+        <td style="font-family:var(--mono)">${detail}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  } catch(e) { el.innerHTML='<div class="empty-state">Unavailable</div>'; }
+}
+
+async function refreshFeePolicyHistory() {
+  const el = document.getElementById('feepolicy-container');
+  try {
+    const d = await fetchJSON('/api/feepolicy/history');
+    if (!d.cycles.length) { el.innerHTML='<div class="empty-state">No fee policy history yet</div>'; return; }
+    el.innerHTML = `<table class="ch-table"><thead><tr>
+      <th>Time</th><th>Mode</th><th>Min PPM</th><th>Max PPM</th>
+    </tr></thead><tbody>${d.cycles.map(c=>{
+      const tag = c.mode==='congestion'?'<span class="tag warn">Congestion</span>':'<span class="tag auto">Normal</span>';
+      return `<tr>
+        <td style="font-family:var(--mono);color:var(--text2)">${c.ts.slice(11)}</td>
+        <td>${tag}</td>
+        <td style="font-family:var(--mono)">${c.min_ppm??'–'}</td>
+        <td style="font-family:var(--mono)">${c.max_ppm??'–'}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  } catch(e) { el.innerHTML='<div class="empty-state">Unavailable</div>'; }
+}
+
+async function refreshConnections() {
+  const el = document.getElementById('connections-container');
+  try {
+    const d = await fetchJSON('/api/connections');
+    el.innerHTML = Object.values(d).map(c=>`
+      <div class="conn-card ${c.ok?'ok':'err'}">
+        <div class="conn-label">${c.label}</div>
+        <div class="conn-status ${c.ok?'ok':'err'}">${c.ok?'● Online':'● Offline'}</div>
+        <div class="conn-detail">${c.detail||'–'}</div>
+        ${c.ms!=null?`<div class="conn-ms">${c.ms} ms</div>`:''}
+        ${c.error?`<div style="font-size:11px;color:var(--red);font-family:var(--mono)">${c.error}</div>`:''}
+      </div>`).join('');
+  } catch(e) { el.innerHTML='<div class="empty-state">Unavailable</div>'; }
+}
+
+async function refreshSafety() {
+  const el = document.getElementById('safety-stats');
+  try {
+    const d = await fetchJSON('/api/safety');
+    const scbCol = d.scb_ok?'green':'red';
+    const scbVal = d.scb_age_hours!=null?`${d.scb_age_hours}h`:'NOT FOUND';
+    const cap = d.total_capacity_sats!=null?(d.total_capacity_sats/1e8).toFixed(4)+' BTC':'–';
+    const local = d.total_local_sats!=null?d.total_local_sats.toLocaleString()+' sats':'–';
+    el.innerHTML = `
+      <div class="stat-card ${scbCol}">
+        <div class="stat-label">SCB Backup age</div>
+        <div class="stat-value" style="font-size:20px">${scbVal}</div>
+        <div class="stat-sub">max allowed: ${d.scb_max_age}h</div>
+        <div class="stat-change ${d.scb_ok?'up':'down'}">${d.scb_ok?'Fresh':'STALE — check backup!'}</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Open channels</div>
+        <div class="stat-value">${d.open_channels??'–'}</div>
+        <div class="stat-sub">live data</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Total capacity</div>
+        <div class="stat-value" style="font-size:18px">${cap}</div>
+        <div class="stat-sub">deployed capital</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Local balance</div>
+        <div class="stat-value" style="font-size:18px">${local}</div>
+        <div class="stat-sub">outbound liquidity</div>
+      </div>`;
+  } catch(e) { el.innerHTML='<div class="empty-state" style="grid-column:1/-1">Unavailable</div>'; }
+}
+// ──────────────────────────────────────────────────────────
+
+// ── Context menu ──────────────────────────────────────────
+const _ctx = {menu: null, pubkey: ''};
+function _ctxInit() {
+  _ctx.menu = document.getElementById('ctx-menu');
+  document.addEventListener('contextmenu', e => {
+    const t = e.target.closest('.peer-name');
+    if (!t) return;
+    e.preventDefault();
+    _ctx.pubkey = t.dataset.pubkey || '';
+    document.getElementById('ctx-label').textContent = t.dataset.alias || 'node';
+    document.getElementById('ctx-copy').onclick = () => {
+      navigator.clipboard.writeText(_ctx.pubkey).catch(() => {});
+      _ctxClose();
+    };
+    document.getElementById('ctx-amboss').onclick = () => { _ctxGo(`https://amboss.space/node/${_ctx.pubkey}`); };
+    document.getElementById('ctx-mempool').onclick = () => { _ctxGo(`https://mempool.space/lightning/node/${_ctx.pubkey}`); };
+    document.getElementById('ctx-1ml').onclick = () => { _ctxGo(`https://1ml.com/node/${_ctx.pubkey}`); };
+    const mx = Math.min(e.clientX, window.innerWidth - 220);
+    const my = Math.min(e.clientY, window.innerHeight - 190);
+    _ctx.menu.style.left = mx + 'px';
+    _ctx.menu.style.top = my + 'px';
+    _ctx.menu.classList.add('open');
+  });
+  document.addEventListener('click', e => {
+    _ctxClose();
+    if (!e.target.closest('#bell-wrap') && !e.target.closest('#bell-ctx-menu')) closeBellCtx();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { _ctxClose(); closeBellCtx(); }
+  });
+}
+function _ctxClose() { _ctx.menu && _ctx.menu.classList.remove('open'); }
+function _ctxGo(url) { window.open(url, '_blank', 'noopener'); _ctxClose(); }
+_ctxInit();
+// ──────────────────────────────────────────────────────────
+
 refreshAll();
-setInterval(refreshAll,30000);
+refreshBell();
+setInterval(refreshAll, 30000);
+setInterval(refreshBell, 5 * 60 * 1000);
 </script>
 </body>
 </html>

@@ -298,7 +298,68 @@ Timeout: This alert does not expire. Do not ignore it.
 
 ---
 
-## 8. Configuration Reference
+## 8. Dashboard
+
+A Flask web UI runs alongside the agent on port 5001, served by `agent/dashboard/server.py`.
+Access it at `http://umbrel.local:5001` on your home network or `http://100.114.226.7:5001`
+over Tailscale when remote.
+
+### Navigation
+
+| View | Path | What it shows |
+|---|---|---|
+| Overview | `/` | Live stats: 7d revenue, rebalance spend, channel count, pending approvals. Channel health table, mempool state, live agent log. Refreshes every 30 seconds. |
+| Channels | Sidebar | All open channels with full AR/AF settings: auto_rebalance, auto_fees, ar_out_target, ar_in_target, ar_max_cost, local fee rate. Right-click any peer name to copy its node ID or open it on Amboss / mempool.space / 1ML. |
+| Cycle Log | Sidebar | Every agent cycle: cycle number, start time, duration, and which actions fired. Parsed from `agent/logs/agent_YYYYMMDD.log`. |
+| Approvals | Sidebar | Pending approval requests with APPROVE / REJECT / SNOOZE controls. Approval decisions are written to `agent/logs/approval_responses.json` and polled by the agent. |
+| Rebalancing | Sidebar | History of AR target updates and one-shot rebalance jobs fired, with channel alias, type, and amount. |
+| Fee Policy | Sidebar | History of AF band changes per cycle: mode (Normal / Congestion), min PPM, max PPM. |
+| Connections | Sidebar | Live health check of all backends — LNDg, Mempool, Alby Hub, SCB backup file — with response times. |
+| Safety | Sidebar | SCB backup age vs configured threshold, open channel count, total deployed capacity, local balance. |
+
+### Architecture
+
+The dashboard server is a thin proxy — it makes no decisions and holds no state.
+Every page load fetches fresh data from LNDg, Mempool, and the local log files.
+Log parsing is done server-side (regex over `agent_*.log`) so the frontend stays simple.
+
+```
+Browser  ──GET──>  Flask (port 5001)  ──>  LNDg API (10.21.21.75:8889)
+                                      ──>  Mempool API (10.21.21.27:8999)
+                                      ──>  Alby Hub API (10.21.0.8:8080)
+                                      ──>  agent/logs/agent_YYYYMMDD.log
+                                      ──>  SCB file (filesystem)
+```
+
+### Systemd services
+
+Two system-level units manage the agent and dashboard:
+
+```bash
+# Agent
+sudo systemctl status lnd-agent
+sudo journalctl -u lnd-agent -f
+
+# Dashboard
+sudo systemctl status lnd-agent-dashboard
+sudo journalctl -u lnd-agent-dashboard -f
+```
+
+Both are enabled for auto-start on boot (`WantedBy=multi-user.target`).
+Unit files live in `/etc/systemd/system/`.
+
+### Adding new views
+
+1. Add a `<div class="view" id="view-NAME">` block inside `.content` in `index.html`.
+2. Add `data-view="NAME"` and `onclick="switchView('NAME')"` to the nav item.
+3. Add an entry to `_VIEW_META` in the JS with the title and subtitle.
+4. Add a `refreshNAME()` async function that fetches from a new or existing API endpoint.
+5. Wire it into the dispatch object inside `switchView()`.
+6. If new data is needed, add a route to `server.py` following the existing pattern.
+
+---
+
+## 9. Configuration Reference
 
 See `config/config.example.yml` for all parameters with descriptions.
 
