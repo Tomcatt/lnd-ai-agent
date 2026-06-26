@@ -19,6 +19,8 @@ from pathlib import Path
 
 log = logging.getLogger("approval.alby")
 
+TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
+
 APPROVALS_FILE = Path("agent/logs/pending_approvals.json")
 RESPONSES_FILE = Path("agent/logs/approval_responses.json")
 
@@ -27,6 +29,8 @@ class AlbyApprovalGate:
     def __init__(self, config: dict):
         self.base_url = config["endpoints"]["albyhub_api"]
         self.token = config["credentials"].get("albyhub_token", "")
+        self.tg_token = config["credentials"].get("telegram_bot_token", "")
+        self.tg_chat_id = config["credentials"].get("telegram_chat_id", "")
         self.channel_timeout_hours = config["approval"]["channel_action_timeout_hours"]
         self.payment_timeout_minutes = config["approval"]["payment_timeout_minutes"]
 
@@ -52,6 +56,7 @@ class AlbyApprovalGate:
 
         self._write_approval(approval)
         self._notify_alby(approval)
+        self._notify_telegram(approval)
         log.info(f"Approval request {request_id} written: {decision.summary}")
         return request_id
 
@@ -132,6 +137,28 @@ class AlbyApprovalGate:
         except Exception:
             pass
         return {}
+
+    def _notify_telegram(self, approval: dict):
+        if not self.tg_token or not self.tg_chat_id:
+            return
+        priority = approval["priority"].upper()
+        icon = {"CRITICAL": "🚨", "HIGH": "⚠️", "MEDIUM": "📋", "LOW": "ℹ️"}.get(priority, "📋")
+        text = (
+            f"{icon} <b>Seoul Node Runner — {priority}</b>\n"
+            f"{approval['summary']}\n\n"
+            f"<i>{approval['meta']}</i>\n"
+            f"Expires: {approval['expires_at']}\n\n"
+            f"Open dashboard to APPROVE / REJECT / SNOOZE"
+        )
+        try:
+            requests.post(
+                TELEGRAM_API.format(token=self.tg_token),
+                json={"chat_id": self.tg_chat_id, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            log.info(f"Telegram notification sent for approval {approval['id']}")
+        except Exception as e:
+            log.debug(f"Telegram notification failed (non-fatal): {e}")
 
     def _notify_alby(self, approval: dict):
         if not self.token:

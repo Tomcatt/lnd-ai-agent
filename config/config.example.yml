@@ -33,6 +33,8 @@ credentials:
   lnbits_agent_wallet_key: "your_lnbits_agent_wallet_invoice_key"
   lnbits_agent_admin_key: "your_lnbits_agent_wallet_admin_key"
   albyhub_token: "your_albyhub_api_token"
+  telegram_bot_token: "your_telegram_bot_token"   # from @BotFather
+  telegram_chat_id: "your_telegram_chat_id"       # from @userinfobot
   lit_macaroon_path: "/root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon"
   lnd_tls_cert_path: "/root/.lnd/tls.cert"
 
