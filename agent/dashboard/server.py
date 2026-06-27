@@ -80,6 +80,64 @@ def api_mempool():
         return jsonify({"error": str(e)}), 503
 
 
+@app.route("/api/chart")
+def api_chart():
+    from datetime import timedelta
+    config = load_config()
+    base = config["endpoints"]["lndg_api"]
+    auth = HTTPBasicAuth(config["credentials"]["lndg_user"], config["credentials"]["lndg_pass"])
+    mempool_base = config["endpoints"]["mempool_api"]
+    try:
+        now = datetime.utcnow()
+        days = [(now - timedelta(days=i)).date() for i in range(6, -1, -1)]
+        labels = [d.strftime("%a %-d") for d in days]
+        revenue_by_day = {d: 0.0 for d in days}
+        rebalance_by_day = {d: 0.0 for d in days}
+
+        fwd_r = requests.get(f"{base}/api/forwards/?limit=1000", auth=auth, timeout=10).json()
+        for f in fwd_r.get("results", []):
+            try:
+                dt = datetime.fromisoformat(f["forward_date"].replace("Z", "+00:00")).date()
+                if dt in revenue_by_day:
+                    revenue_by_day[dt] += f.get("fee", 0) or 0
+            except Exception:
+                pass
+
+        pay_r = requests.get(f"{base}/api/payments/?limit=1000", auth=auth, timeout=10).json()
+        for p in pay_r.get("results", []):
+            if p.get("rebal_chan") is None or p.get("status") != 2:
+                continue
+            fee = p.get("fee", 0) or 0
+            if fee <= 0:
+                continue
+            try:
+                dt = datetime.fromisoformat(p["creation_date"].replace("Z", "+00:00")).date()
+                if dt in rebalance_by_day:
+                    rebalance_by_day[dt] += fee
+            except Exception:
+                pass
+
+        ch_r = requests.get(f"{base}/api/channels/?limit=100", auth=auth, timeout=10).json()
+        channel_count = sum(1 for c in ch_r.get("results", []) if c.get("is_open"))
+
+        fee_rate = 0
+        try:
+            fees = requests.get(f"{mempool_base}/api/v1/fees/recommended", timeout=5).json()
+            fee_rate = fees.get("hourFee", 0)
+        except Exception:
+            pass
+
+        return jsonify({
+            "labels": labels,
+            "revenue": [round(revenue_by_day[d], 1) for d in days],
+            "rebalance": [round(rebalance_by_day[d], 1) for d in days],
+            "channel_count": channel_count,
+            "fee_rate": fee_rate,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 503
+
+
 @app.route("/api/channels")
 def api_channels():
     config = load_config()

@@ -230,7 +230,20 @@
   .bell-wrap:hover,.bell-wrap:focus{background:var(--surface2);color:var(--text);outline:none;}
   .bell-wrap svg{width:18px;height:18px;}
   .bell-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:var(--mono);line-height:1;border:2px solid var(--bg);pointer-events:none;}
+
+  /* ── Floating Chart Panel ─────────────────────────────── */
+  #chart-panel{position:fixed;bottom:24px;right:24px;width:420px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:900;user-select:none;}
+  #chart-panel.minimized #chart-body{display:none;}
+  #chart-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:grab;border-bottom:1px solid var(--border);}
+  #chart-header:active{cursor:grabbing;}
+  #chart-header-title{font-size:12px;font-weight:600;color:var(--cyan);font-family:var(--mono);letter-spacing:.05em;}
+  #chart-header-meta{font-size:11px;color:var(--text2);font-family:var(--mono);}
+  #chart-header-btns{display:flex;gap:6px;align-items:center;}
+  .chart-hbtn{background:none;border:1px solid var(--border);color:var(--text2);border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;font-family:var(--mono);}
+  .chart-hbtn:hover{color:var(--cyan);border-color:var(--cyan);}
+  #chart-body{padding:12px 14px 10px;}
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -1428,6 +1441,148 @@ refreshAll();
 refreshBell();
 setInterval(refreshAll, 30000);
 setInterval(refreshBell, 5 * 60 * 1000);
+refreshChart();
+setInterval(refreshChart, 5 * 60 * 1000);
+</script>
+
+<!-- ── Floating Chart Panel ──────────────────────────────── -->
+<div id="chart-panel">
+  <div id="chart-header">
+    <div>
+      <div id="chart-header-title">7-DAY NODE PERFORMANCE</div>
+      <div id="chart-header-meta">— sats</div>
+    </div>
+    <div id="chart-header-btns">
+      <button class="chart-hbtn" onclick="toggleChart()">—</button>
+    </div>
+  </div>
+  <div id="chart-body">
+    <canvas id="nodeChart" height="160"></canvas>
+  </div>
+</div>
+
+<script>
+// ── Floating chart drag ───────────────────────────────────
+(function(){
+  const panel = document.getElementById('chart-panel');
+  const header = document.getElementById('chart-header');
+  let dragging=false, ox=0, oy=0;
+  header.addEventListener('mousedown', e=>{
+    if(e.target.tagName==='BUTTON') return;
+    dragging=true;
+    ox = e.clientX - panel.getBoundingClientRect().left;
+    oy = e.clientY - panel.getBoundingClientRect().top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    panel.style.left = (e.clientX - ox) + 'px';
+    panel.style.top  = (e.clientY - oy) + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', ()=>{ dragging=false; });
+})();
+
+function toggleChart(){
+  const p = document.getElementById('chart-panel');
+  const btn = p.querySelector('.chart-hbtn');
+  p.classList.toggle('minimized');
+  btn.textContent = p.classList.contains('minimized') ? '□' : '—';
+}
+
+// ── Chart instance ────────────────────────────────────────
+let _chart = null;
+
+async function refreshChart(){
+  try {
+    const d = await fetch('/api/chart').then(r=>r.json());
+    if(d.error) return;
+
+    document.getElementById('chart-header-meta').textContent =
+      `${d.channel_count} channels · ${d.fee_rate} sat/vB`;
+
+    const ctx = document.getElementById('nodeChart').getContext('2d');
+    const cyan  = getComputedStyle(document.documentElement).getPropertyValue('--cyan').trim()  || '#00d4ff';
+    const green = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#43d17a';
+    const red   = getComputedStyle(document.documentElement).getPropertyValue('--red').trim()   || '#ff4f4f';
+    const text2 = getComputedStyle(document.documentElement).getPropertyValue('--text2').trim() || '#8899aa';
+    const border= getComputedStyle(document.documentElement).getPropertyValue('--border').trim()|| '#1e2a38';
+
+    const chartData = {
+      labels: d.labels,
+      datasets: [
+        {
+          label: 'Revenue',
+          data: d.revenue,
+          backgroundColor: green + '33',
+          borderColor: green,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          yAxisID: 'ySats',
+          pointRadius: 3,
+        },
+        {
+          label: 'Rebalance',
+          data: d.rebalance,
+          backgroundColor: red + '22',
+          borderColor: red,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          yAxisID: 'ySats',
+          pointRadius: 3,
+        },
+        {
+          label: 'Fee rate',
+          data: d.labels.map(() => d.fee_rate),
+          borderColor: cyan,
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          fill: false,
+          yAxisID: 'yFee',
+        },
+      ]
+    };
+
+    const opts = {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: text2, font: { size: 10, family: 'monospace' }, boxWidth: 12 } },
+        tooltip: { backgroundColor: '#0a1628', titleColor: cyan, bodyColor: text2,
+                   borderColor: border, borderWidth: 1 },
+      },
+      scales: {
+        x: { ticks: { color: text2, font: { size: 10 } }, grid: { color: border } },
+        ySats: {
+          position: 'left',
+          ticks: { color: green, font: { size: 10 },
+                   callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
+          grid: { color: border },
+          title: { display: true, text: 'sats', color: text2, font: { size: 9 } },
+        },
+        yFee: {
+          position: 'right',
+          ticks: { color: cyan, font: { size: 10 }, callback: v => v+'s/vB' },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'sat/vB', color: cyan, font: { size: 9 } },
+        },
+      }
+    };
+
+    if(_chart){
+      _chart.data = chartData;
+      _chart.options = opts;
+      _chart.update();
+    } else {
+      _chart = new Chart(ctx, { type: 'line', data: chartData, options: opts });
+    }
+  } catch(e) { console.warn('chart error', e); }
+}
 </script>
 </body>
 </html>
