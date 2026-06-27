@@ -231,17 +231,22 @@
   .bell-wrap svg{width:18px;height:18px;}
   .bell-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:var(--mono);line-height:1;border:2px solid var(--bg);pointer-events:none;}
 
-  /* ── Floating Chart Panel ─────────────────────────────── */
-  #chart-panel{position:fixed;bottom:24px;right:24px;width:420px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:900;user-select:none;}
-  #chart-panel.minimized #chart-body{display:none;}
-  #chart-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:grab;border-bottom:1px solid var(--border);}
-  #chart-header:active{cursor:grabbing;}
-  #chart-header-title{font-size:12px;font-weight:600;color:var(--cyan);font-family:var(--mono);letter-spacing:.05em;}
-  #chart-header-meta{font-size:11px;color:var(--text2);font-family:var(--mono);}
-  #chart-header-btns{display:flex;gap:6px;align-items:center;}
-  .chart-hbtn{background:none;border:1px solid var(--border);color:var(--text2);border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;font-family:var(--mono);}
-  .chart-hbtn:hover{color:var(--cyan);border-color:var(--cyan);}
-  #chart-body{padding:12px 14px 10px;}
+  /* ── Chart hover popup ───────────────────────────────── */
+  #chart-trigger{position:relative;display:inline-flex;}
+  #chart-popup{
+    display:none;position:absolute;top:calc(100% + 10px);right:0;width:440px;
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:1000;
+  }
+  #chart-trigger:hover #chart-popup,
+  #chart-popup:hover{display:block;}
+  #chart-popup-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;border-bottom:1px solid var(--border);
+  }
+  #chart-popup-title{font-size:12px;font-weight:600;color:var(--cyan);font-family:var(--mono);letter-spacing:.05em;}
+  #chart-popup-meta{font-size:11px;color:var(--text2);font-family:var(--mono);}
+  #chart-popup-body{padding:12px 14px 10px;}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
@@ -328,6 +333,20 @@
         <button class="btn btn-danger" id="agent-stop-btn" style="display:none" onclick="agentStop()">■ Stop agent</button>
         <button class="btn btn-success" id="agent-start-btn" style="display:none" onclick="agentStart()">▶ Start agent</button>
         <button class="btn btn-primary" id="mode-btn" onclick="toggleMode()">Go live</button>
+        <div id="chart-trigger">
+          <button class="btn" title="Node performance chart">⬡ Chart</button>
+          <div id="chart-popup">
+            <div id="chart-popup-header">
+              <div>
+                <div id="chart-popup-title">7-DAY NODE PERFORMANCE</div>
+                <div id="chart-popup-meta">— sats</div>
+              </div>
+            </div>
+            <div id="chart-popup-body">
+              <canvas id="nodeChart" height="160"></canvas>
+            </div>
+          </div>
+        </div>
         <div class="bell-wrap" id="bell-wrap" tabindex="0" title="LND+ messages"
              onclick="bellCtxOpen(event)" oncontextmenu="bellCtxOpen(event)"
              onkeydown="if(event.key==='Enter'||event.key===' ')bellCtxOpen(event)">
@@ -1445,51 +1464,7 @@ refreshChart();
 setInterval(refreshChart, 5 * 60 * 1000);
 </script>
 
-<!-- ── Floating Chart Panel ──────────────────────────────── -->
-<div id="chart-panel">
-  <div id="chart-header">
-    <div>
-      <div id="chart-header-title">7-DAY NODE PERFORMANCE</div>
-      <div id="chart-header-meta">— sats</div>
-    </div>
-    <div id="chart-header-btns">
-      <button class="chart-hbtn" onclick="toggleChart()">—</button>
-    </div>
-  </div>
-  <div id="chart-body">
-    <canvas id="nodeChart" height="160"></canvas>
-  </div>
-</div>
-
 <script>
-// ── Floating chart drag ───────────────────────────────────
-(function(){
-  const panel = document.getElementById('chart-panel');
-  const header = document.getElementById('chart-header');
-  let dragging=false, ox=0, oy=0;
-  header.addEventListener('mousedown', e=>{
-    if(e.target.tagName==='BUTTON') return;
-    dragging=true;
-    ox = e.clientX - panel.getBoundingClientRect().left;
-    oy = e.clientY - panel.getBoundingClientRect().top;
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e=>{
-    if(!dragging) return;
-    panel.style.left = (e.clientX - ox) + 'px';
-    panel.style.top  = (e.clientY - oy) + 'px';
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-  });
-  document.addEventListener('mouseup', ()=>{ dragging=false; });
-})();
-
-function toggleChart(){
-  const p = document.getElementById('chart-panel');
-  const btn = p.querySelector('.chart-hbtn');
-  p.classList.toggle('minimized');
-  btn.textContent = p.classList.contains('minimized') ? '□' : '—';
-}
 
 // ── Chart instance ────────────────────────────────────────
 let _chart = null;
@@ -1499,7 +1474,7 @@ async function refreshChart(){
     const d = await fetch('/api/chart').then(r=>r.json());
     if(d.error) return;
 
-    document.getElementById('chart-header-meta').textContent =
+    document.getElementById('chart-popup-meta').textContent =
       `${d.channel_count} channels · ${d.fee_rate} sat/vB`;
 
     const ctx = document.getElementById('nodeChart').getContext('2d');
