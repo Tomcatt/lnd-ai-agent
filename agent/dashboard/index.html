@@ -231,6 +231,20 @@
   .bell-wrap svg{width:18px;height:18px;}
   .bell-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:var(--mono);line-height:1;border:2px solid var(--bg);pointer-events:none;}
 
+  /* ── Node link popup ────────────────────────────────── */
+  #node-popup{
+    display:none;position:fixed;z-index:1100;
+    background:var(--surface);border:1px solid var(--cyan);border-radius:8px;
+    box-shadow:0 6px 24px rgba(0,0,0,.6);padding:10px 14px;min-width:220px;
+  }
+  #node-popup-alias{font-size:12px;font-weight:600;color:var(--cyan);font-family:var(--mono);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .node-popup-link{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);font-size:12px;}
+  .node-popup-link:last-child{border-bottom:none;}
+  .node-popup-link:hover{color:var(--cyan);}
+  .node-popup-link svg{flex-shrink:0;opacity:.7;}
+  .peer-name{cursor:pointer;}
+  .peer-name:hover{color:var(--cyan);}
+
   /* ── Chart hover popup ───────────────────────────────── */
   #chart-trigger{position:relative;display:inline-flex;}
   #chart-popup{
@@ -1558,6 +1572,59 @@ async function refreshChart(){
     }
   } catch(e) { console.warn('chart error', e); }
 }
+</script>
+
+<!-- ── Node link popup ───────────────────────────────────── -->
+<div id="node-popup">
+  <div id="node-popup-alias"></div>
+  <a id="node-link-amboss" class="node-popup-link" href="#" target="_blank" rel="noopener">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    View on Amboss
+  </a>
+  <a id="node-link-lnplus" class="node-popup-link" href="#" target="_blank" rel="noopener">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    View on Lightning Node+
+  </a>
+</div>
+
+<script>
+(function(){
+  const popup = document.getElementById('node-popup');
+
+  function openNodePopup(e, el){
+    const pubkey = el.dataset.pubkey;
+    const alias  = el.dataset.alias || el.textContent;
+    if(!pubkey) return;
+    document.getElementById('node-popup-alias').textContent = alias;
+    document.getElementById('node-link-amboss').href = `https://amboss.space/node/${pubkey}`;
+    document.getElementById('node-link-lnplus').href = `https://lightningnetwork.plus/nodes/${pubkey}`;
+
+    // Position near the click, nudge away from viewport edges
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = e.clientX + 12, y = e.clientY + 12;
+    popup.style.display = 'block';
+    const pw = popup.offsetWidth, ph = popup.offsetHeight;
+    if(x + pw > vw - 8) x = e.clientX - pw - 8;
+    if(y + ph > vh - 8) y = e.clientY - ph - 8;
+    popup.style.left = x + 'px';
+    popup.style.top  = y + 'px';
+    e.stopPropagation();
+  }
+
+  function closeNodePopup(){ popup.style.display = 'none'; }
+
+  // Delegate click to any .peer-name element
+  document.addEventListener('click', e=>{
+    const el = e.target.closest('.peer-name');
+    if(el){ openNodePopup(e, el); return; }
+    // Click outside popup closes it
+    if(!popup.contains(e.target)) closeNodePopup();
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape') closeNodePopup();
+  });
+})();
 </script>
 </body>
 </html>
