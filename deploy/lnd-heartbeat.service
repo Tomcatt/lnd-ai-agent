@@ -1,0 +1,17 @@
+[Unit]
+Description=LND AI Agent Heartbeat Monitor
+After=network-online.target umbrel.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=umbrel
+WorkingDirectory=/home/umbrel/Projects/lnd-ai-agent
+ExecStart=/usr/bin/python3 agent/heartbeat/monitor.py
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
