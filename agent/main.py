@@ -19,6 +19,7 @@ from agent.actions.rebalance import RebalanceAction
 from agent.actions.fee_policy import FeePolicyAction
 from agent.actions.loop_swap import LoopSwapAction
 from agent.approval.alby_gate import AlbyApprovalGate
+from agent.notifications.ntfy import NtfyNotifier
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
@@ -79,8 +80,15 @@ def main():
     # Initialise approval gate
     approval_gate = AlbyApprovalGate(config)
 
+    # Initialise notifier
+    notifier = NtfyNotifier(config)
+    if notifier.enabled():
+        log.info(f"ntfy notifications enabled: {notifier.url}")
+    else:
+        log.warning("ntfy not configured — push notifications disabled")
+
     # Initialise decision engine
-    engine = DecisionEngine(config, monitors, actions, approval_gate)
+    engine = DecisionEngine(config, monitors, actions, approval_gate, notifier=notifier)
 
     # Initialise scheduler
     scheduler = Scheduler(

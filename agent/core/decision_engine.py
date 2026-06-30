@@ -22,11 +22,13 @@ class Decision:
 
 
 class DecisionEngine:
-    def __init__(self, config: dict, monitors: dict, actions: dict, approval_gate):
+    def __init__(self, config: dict, monitors: dict, actions: dict, approval_gate,
+                 notifier=None):
         self.config = config
         self.monitors = monitors
         self.actions = actions
         self.approval_gate = approval_gate
+        self.notifier = notifier
         self.cfg = config
         self._rebalance_failures: dict = {}
 
@@ -217,9 +219,9 @@ class DecisionEngine:
                 decisions.append(Decision(
                     rule="loop_swap",
                     priority="medium",
-                    action_type="autonomous",
-                    summary=f"Loop In for {ch.get('peer_alias')} — rebalancing failed {failures}x, local {ch.get('local_balance_pct'):.0f}%",
-                    data=ch,
+                    action_type="instruct_human",
+                    summary=f"Loop In needed: {ch.get('peer_alias')} — rebalancing failed {failures}x, local {ch.get('local_balance_pct'):.0f}%",
+                    data={**ch, "failures": failures},
                 ))
         return decisions if decisions else None
 
@@ -261,3 +263,23 @@ class DecisionEngine:
         log.warning(f"HUMAN ACTION REQUIRED: {decision.summary}")
         for i, step in enumerate(instructions, 1):
             log.warning(f"  Step {i}: {step}")
+
+        if decision.rule == "loop_swap" and self.notifier:
+            ch = decision.data
+            alias = ch.get("peer_alias", "unknown")
+            cap = ch.get("capacity_sats", 0)
+            local_pct = ch.get("local_balance_pct", 0)
+            local_sats = ch.get("local_balance_sats", 0)
+            swap_est = max(0, int(cap * 0.4) - local_sats)
+            self.notifier.send(
+                title=f"Loop In needed — {alias}",
+                message=(
+                    f"Channel {alias} is {local_pct:.0f}% local ({local_sats:,} / {cap:,} sat).\n"
+                    f"Rebalancing has failed {ch.get('failures', '?')}x — Loop In ~{swap_est:,} sat.\n"
+                    f"Action: Lightning Terminal → Loop → Loop In"
+                ),
+                priority="high",
+                tags="zap,warning",
+                dedup_key=f"loop_swap_{ch.get('chan_id', alias)}",
+                cooldown_hours=24.0,
+            )

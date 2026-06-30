@@ -28,7 +28,9 @@ def make_engine(base_config, signals_override=None):
     for action in actions.values():
         action.execute.return_value = {"status": "dry_run"}
     approval_gate = MagicMock()
-    engine = DecisionEngine(base_config, monitors, actions, approval_gate)
+    notifier = MagicMock()
+    notifier.enabled.return_value = True
+    engine = DecisionEngine(base_config, monitors, actions, approval_gate, notifier=notifier)
     return engine, actions, approval_gate
 
 
@@ -199,3 +201,40 @@ class TestSafetyGuarantees:
         })
         actions["rebalance"].execute.side_effect = Exception("LNDg API timeout")
         engine.run_cycle()
+
+
+class TestLoopSwapNotification:
+
+    def _make_loop_candidate(self):
+        return {
+            "chan_id": "555x1x0", "peer_alias": "DrainedPeer", "peer_pubkey": "02ddd",
+            "local_balance_pct": 5.0, "local_balance_sats": 50_000,
+            "capacity_sats": 1_000_000, "estimated_rebalance_cost_sats": 50,
+        }
+
+    def test_loop_candidate_sends_ntfy(self, base_config):
+        ch = self._make_loop_candidate()
+        engine, _, _ = make_engine(base_config, {"lndg": {"imbalanced_channels": [ch]}})
+        # Simulate enough failures to cross the threshold
+        engine._rebalance_failures["555x1x0"] = base_config["rebalancing"]["loop_fallback_after_failures"]
+        engine.run_cycle()
+        engine.notifier.send.assert_called_once()
+        call_kwargs = engine.notifier.send.call_args[1]
+        assert "DrainedPeer" in call_kwargs["title"]
+        assert call_kwargs["priority"] == "high"
+        assert call_kwargs["dedup_key"].startswith("loop_swap_")
+
+    def test_loop_candidate_not_sent_below_threshold(self, base_config):
+        ch = self._make_loop_candidate()
+        engine, _, _ = make_engine(base_config, {"lndg": {"imbalanced_channels": [ch]}})
+        # Only 1 failure — below threshold of 3
+        engine._rebalance_failures["555x1x0"] = 1
+        engine.run_cycle()
+        engine.notifier.send.assert_not_called()
+
+    def test_loop_swap_action_never_called_autonomously(self, base_config):
+        ch = self._make_loop_candidate()
+        engine, actions, _ = make_engine(base_config, {"lndg": {"imbalanced_channels": [ch]}})
+        engine._rebalance_failures["555x1x0"] = base_config["rebalancing"]["loop_fallback_after_failures"]
+        engine.run_cycle()
+        actions["loop_swap"].execute.assert_not_called()

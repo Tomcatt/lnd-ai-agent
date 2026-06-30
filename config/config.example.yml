@@ -112,6 +112,13 @@ channel_health:
   htlc_failure_weekly_threshold: 3
 
 # ─────────────────────────────────────────
+# Notifications
+# ─────────────────────────────────────────
+notifications:
+  ntfy_server: "https://ntfy.sh"
+  ntfy_topic: "your_ntfy_topic"   # leave blank to disable push notifications
+
+# ─────────────────────────────────────────
 # Safety
 # ─────────────────────────────────────────
 safety:
