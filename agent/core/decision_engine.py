@@ -271,11 +271,25 @@ class DecisionEngine:
             local_pct = ch.get("local_balance_pct", 0)
             local_sats = ch.get("local_balance_sats", 0)
             swap_est = max(0, int(cap * 0.4) - local_sats)
+            # Fee estimates: Loop charges ~0.5% swap fee + ~0.2% miner fee + ~0.5% routing
+            fee_swap = int(swap_est * 0.005)
+            fee_miner = int(swap_est * 0.002)
+            fee_routing = int(swap_est * 0.005)
+            fee_total = fee_swap + fee_miner + fee_routing
+            fee_pct = (fee_total / swap_est * 100) if swap_est else 0
             self.notifier.send(
                 title=f"Loop In needed — {alias}",
                 message=(
-                    f"Channel {alias} is {local_pct:.0f}% local ({local_sats:,} / {cap:,} sat).\n"
-                    f"Rebalancing has failed {ch.get('failures', '?')}x — Loop In ~{swap_est:,} sat.\n"
+                    f"Channel: {alias}\n"
+                    f"Balance: {local_pct:.0f}% local ({local_sats:,} / {cap:,} sat)\n"
+                    f"Rebalance failures: {ch.get('failures', '?')}x\n"
+                    f"\n"
+                    f"Swap amount: ~{swap_est:,} sat\n"
+                    f"Est. fees:   ~{fee_total:,} sat ({fee_pct:.1f}%)\n"
+                    f"  Swap fee:    {fee_swap:,} sat\n"
+                    f"  Miner fee:   {fee_miner:,} sat\n"
+                    f"  Routing fee: {fee_routing:,} sat\n"
+                    f"\n"
                     f"Action: Lightning Terminal → Loop → Loop In"
                 ),
                 priority="high",
