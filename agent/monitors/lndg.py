@@ -11,6 +11,8 @@ Field mapping confirmed against live LNDg API on Umbrel:
 """
 
 import logging
+from typing import Any
+
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -28,8 +30,8 @@ class LNDgMonitor:
         self.max_local_pct = config["rebalancing"]["max_local_balance_pct"]
         self.zombie_days = config["channel_health"]["zombie_routing_days"]
 
-    def collect(self) -> dict:
-        signals = {}
+    def collect(self) -> dict[str, Any]:
+        signals: dict[str, Any] = {}
         try:
             channels = self._get_all_channels()
             open_channels = [c for c in channels if c.get("is_open", False)]
@@ -72,7 +74,7 @@ class LNDgMonitor:
             data = r.json()
             results.extend(data.get("results", []))
             next_url = data.get("next")
-            url = next_url if next_url and next_url != url else None
+            url = next_url if next_url and next_url != url else ""
         return results
 
     def _get_all_payments(self) -> list:
@@ -85,7 +87,7 @@ class LNDgMonitor:
             data = r.json()
             results.extend(data.get("results", []))
             next_url = data.get("next")
-            url = next_url if next_url and next_url != url else None
+            url = next_url if next_url and next_url != url else ""
             pages += 1
         return results
 
@@ -136,7 +138,7 @@ class LNDgMonitor:
     def _calc_revenue_7d(self, payments: list) -> dict:
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() - timedelta(days=7)
-        revenue = {}
+        revenue: dict[str, float] = {}
         for p in payments:
             if p.get("rebal_chan") is not None:
                 continue
@@ -159,7 +161,7 @@ class LNDgMonitor:
     def _calc_rebalance_cost_7d(self, payments: list) -> dict:
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() - timedelta(days=7)
-        costs = {}
+        costs: dict[str, float] = {}
         for p in payments:
             if p.get("rebal_chan") is None:
                 continue
