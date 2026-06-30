@@ -35,8 +35,9 @@ def base_config():
             "loop_fallback_after_failures": 3,
         },
         "fees": {
-            "base_fee_msat": 1000, "base_fee_rate_ppm": 100,
-            "congestion_fee_bump_ppm": 50, "congestion_threshold_mb": 50,
+            "base_fee_msat": 1000, "base_fee_rate_ppm": 1000,
+            "normal_min_ppm": 100,
+            "congestion_fee_bump_ppm": 200, "congestion_threshold_mb": 50,
         },
         "loop": {"max_fee_rate_sat_vbyte": 15, "trigger_below_local_pct": 10},
         "approval": {

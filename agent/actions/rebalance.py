@@ -1,13 +1,13 @@
 """
-Rebalance Action — drives LNDg AR targets instead of
-executing rebalances directly.
+Rebalance Action — drives LNDg AR targets only.
+
+Boundary rule: this agent NEVER fires payments directly.
+POST /api/rebalancer/ is LNDg's job. We set the targets;
+LNDg AR executes on its own schedule.
 
 Strategy:
 - Update ar_out_target/ar_in_target via PUT /api/channels/<id>/
-  so LNDg AR knows what to aim for
-- For critical imbalance (< 5% or > 95%), also fire one-shot
-  via POST /api/rebalancer/
-- LNDg handles execution — we set the targets
+- LNDg AR picks up the targets and handles execution
 """
 
 import logging
@@ -52,19 +52,9 @@ class RebalanceAction:
             return {"status": "dry_run", "channel": peer_alias,
                     "ar_out_target": ar_out_target, "ar_in_target": ar_in_target}
 
-        result = self._update_channel_ar(
+        return self._update_channel_ar(
             chan_id, peer_alias, ar_out_target, ar_in_target, amt_target
         )
-
-        if local_pct < 5 or local_pct > 95:
-            log.info(f"Critical imbalance on {peer_alias} ({local_pct}%) — "
-                     f"firing one-shot rebalancer")
-            oneshot = self._fire_oneshot(
-                chan_id, peer_alias, peer_pubkey, local_pct, capacity, local_sats
-            )
-            result["oneshot"] = oneshot
-
-        return result
 
     def _update_channel_ar(self, chan_id, peer_alias,
                            ar_out_target, ar_in_target, amt_target) -> dict:
@@ -92,36 +82,3 @@ class RebalanceAction:
             log.error(f"AR target update failed for {peer_alias}: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def _fire_oneshot(self, chan_id, peer_alias, peer_pubkey, local_pct,
-                      capacity, local_sats) -> dict:
-        target = capacity // 2
-        value = abs(local_sats - target)
-        if local_pct > 95:
-            payload = {
-                "value": value,
-                "fee_limit": int(value * 0.001),
-                "outgoing_chan_ids": f"[{chan_id}]",
-                "target_alias": peer_alias,
-                "duration": 5,
-                "manual": True,
-            }
-        else:
-            payload = {
-                "value": value,
-                "fee_limit": int(value * 0.001),
-                "last_hop_pubkey": peer_pubkey,
-                "target_alias": peer_alias,
-                "duration": 5,
-                "manual": True,
-            }
-        try:
-            r = requests.post(
-                f"{self.base_url}/api/rebalancer/",
-                json=payload, auth=self.auth, timeout=15,
-            )
-            r.raise_for_status()
-            log.info(f"One-shot rebalance fired for {peer_alias}: {value} sats")
-            return {"status": "success", "value": value}
-        except requests.HTTPError as e:
-            log.error(f"One-shot rebalance failed for {peer_alias}: {e}")
-            return {"status": "failed", "error": str(e)}

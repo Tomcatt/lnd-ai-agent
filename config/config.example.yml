@@ -63,11 +63,14 @@ fees:
   # Base fee in millisatoshis
   base_fee_msat: 1000
 
-  # Base fee rate in PPM (parts per million)
-  base_fee_rate_ppm: 100
+  # Base fee rate in PPM — this becomes the AF-MaxRate ceiling in normal mode
+  base_fee_rate_ppm: 1000
 
-  # Extra PPM added when mempool is congested
-  congestion_fee_bump_ppm: 50
+  # Floor PPM in normal mode (AF-MinRate) — prevents AF dragging channels to zero
+  normal_min_ppm: 100
+
+  # Extra PPM added to floor when mempool is congested; ceiling doubles
+  congestion_fee_bump_ppm: 200
 
   # Mempool is "congested" above this size in MB
   congestion_threshold_mb: 50

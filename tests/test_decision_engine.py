@@ -132,14 +132,17 @@ class TestFeePolicyRule:
         engine, actions, _ = make_engine(base_config, {"mempool": {"mempool_congested": False}})
         engine.run_cycle()
         call_data = actions["fee_policy"].execute.call_args[0][0]
-        assert call_data["target_ppm"] == 100
+        base = base_config["fees"]["base_fee_rate_ppm"]
+        assert call_data["target_ppm"] == base
         assert call_data["congested"] is False
 
     def test_elevated_fee_when_congested(self, base_config):
         engine, actions, _ = make_engine(base_config, {"mempool": {"mempool_congested": True}})
         engine.run_cycle()
         call_data = actions["fee_policy"].execute.call_args[0][0]
-        assert call_data["target_ppm"] == 150
+        base = base_config["fees"]["base_fee_rate_ppm"]
+        bump = base_config["fees"]["congestion_fee_bump_ppm"]
+        assert call_data["target_ppm"] == base + bump
         assert call_data["congested"] is True
 
 

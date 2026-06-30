@@ -1,12 +1,15 @@
 """
 Fee Policy Action — drives LNDg Auto-Fees (AF) band.
 
-Normal mempool:    AF band 0–500 PPM
-Congested mempool: AF band 150–2500 PPM (raises floor and ceiling)
+Normal:     AF band min=normal_min_ppm  max=base_fee_rate_ppm
+Congested:  AF band min=base+bump       max=base_fee_rate_ppm*2
 LNDg AF handles per-channel execution within the band.
 
+Boundary rule: never set individual channel fee rates directly —
+that belongs to LNDg AF. Only set the global band here.
+
 API: PUT /api/settings/{key}/ with {"value": "..."}
-Confirmed keys: AF-MinRate, AF-MaxRate, AF-LowLiqLimit
+Confirmed keys: AF-MinRate, AF-MaxRate
 """
 
 import logging
@@ -24,27 +27,25 @@ class FeePolicyAction:
             config["credentials"]["lndg_pass"],
         )
         self.dry_run = dry_run
-        self.base_ppm = config["fees"]["base_fee_rate_ppm"]
+        self.normal_min = config["fees"]["normal_min_ppm"]
+        self.normal_max = config["fees"]["base_fee_rate_ppm"]
         self.bump_ppm = config["fees"]["congestion_fee_bump_ppm"]
 
     def execute(self, data: dict) -> dict:
         congested = data.get("congested", False)
 
         if congested:
-            af_min = self.base_ppm + self.bump_ppm
-            af_max = 2500
-            af_low_liq = 10
+            af_min = self.normal_min + self.bump_ppm
+            af_max = self.normal_max * 2
             mode = "congestion"
         else:
-            af_min = 0
-            af_max = 500
-            af_low_liq = 15
+            af_min = self.normal_min
+            af_max = self.normal_max
             mode = "normal"
 
         if self.dry_run:
             log.info(f"[DRY RUN] Would set AF band: "
-                     f"min={af_min} max={af_max} "
-                     f"low_liq={af_low_liq} ({mode} mode)")
+                     f"min={af_min} max={af_max} ({mode} mode)")
             return {"status": "dry_run", "mode": mode,
                     "af_min": af_min, "af_max": af_max}
 
@@ -52,7 +53,6 @@ class FeePolicyAction:
         settings = {
             "AF-MinRate": str(af_min),
             "AF-MaxRate": str(af_max),
-            "AF-LowLiqLimit": str(af_low_liq),
         }
 
         for key, value in settings.items():

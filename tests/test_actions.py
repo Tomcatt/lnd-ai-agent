@@ -59,7 +59,8 @@ class TestRebalanceAction:
             })
         assert result["status"] == "failed"
 
-    def test_critical_imbalance_fires_oneshot(self, base_config):
+    def test_critical_imbalance_only_sets_ar_targets(self, base_config):
+        """Agent never fires payments — even critical imbalance only sets AR targets."""
         action = RebalanceAction(base_config, dry_run=False)
         mock_ch = {"chan_id": "111x1x0", "auto_rebalance": False,
                    "ar_out_target": 75, "ar_in_target": 90, "ar_amt_target": 0}
@@ -70,15 +71,14 @@ class TestRebalanceAction:
             mg.return_value.json.return_value = mock_ch
             mp.return_value = MagicMock(status_code=200)
             mp.return_value.json.return_value = mock_ch
-            mpost.return_value = MagicMock(status_code=200)
-            mpost.return_value.json.return_value = {"id": 1}
             result = action.execute({
                 "chan_id": "111x1x0", "peer_alias": "CriticalPeer",
                 "capacity_sats": 2_000_000, "local_balance_sats": 1_980_000,
                 "local_balance_pct": 99.0, "estimated_rebalance_cost_sats": 50,
             })
-            mpost.assert_called_once()
-        assert "oneshot" in result
+            mpost.assert_not_called()
+        assert result["status"] == "success"
+        assert "oneshot" not in result
 
 
 class TestFeePolicyAction:
@@ -94,23 +94,23 @@ class TestFeePolicyAction:
     def test_congested_raises_af_floor(self, base_config):
         action = FeePolicyAction(base_config, dry_run=True)
         result = action.execute({"congested": True})
-        assert result["af_min"] > 0
-        assert result["af_max"] == 2500
+        assert result["af_min"] > base_config["fees"]["normal_min_ppm"]
+        assert result["af_max"] == base_config["fees"]["base_fee_rate_ppm"] * 2
 
     def test_normal_mode_standard_band(self, base_config):
         action = FeePolicyAction(base_config, dry_run=True)
         result = action.execute({"congested": False})
-        assert result["af_min"] == 0
-        assert result["af_max"] == 500
+        assert result["af_min"] == base_config["fees"]["normal_min_ppm"]
+        assert result["af_max"] == base_config["fees"]["base_fee_rate_ppm"]
         assert result["mode"] == "normal"
 
-    def test_live_mode_puts_three_settings(self, base_config):
+    def test_live_mode_puts_two_settings(self, base_config):
         action = FeePolicyAction(base_config, dry_run=False)
         with patch("agent.actions.fee_policy.requests.put") as mp:
             mp.return_value = MagicMock(status_code=200)
             mp.return_value.json.return_value = {}
             result = action.execute({"congested": False})
-            assert mp.call_count == 3
+            assert mp.call_count == 2  # AF-MinRate and AF-MaxRate only
         assert result["status"] == "success"
 
 
