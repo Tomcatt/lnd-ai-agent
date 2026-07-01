@@ -153,8 +153,14 @@ class DecisionEngine:
         log.info(f"Rebalancing: {len(imbalanced)} imbalanced channels, "
                  f"revenue on {len(revenue)} channels")
 
+        skip_pubkeys = set(self.cfg["rebalancing"].get("skip_pubkeys", []))
+
         decisions = []
         for ch in imbalanced:
+            if ch.get("peer_pubkey") in skip_pubkeys:
+                log.info(f"Skipping {ch.get('peer_alias')} — in skip_pubkeys list")
+                continue
+
             ch_id = str(ch.get("chan_id", ""))
             ch_revenue = revenue.get(ch_id, 0)
             projected_cost = ch.get("estimated_rebalance_cost_sats", 0)
@@ -209,8 +215,12 @@ class DecisionEngine:
         fallback_threshold = self.cfg["rebalancing"]["loop_fallback_after_failures"]
         imbalanced = signals.get("lndg", {}).get("imbalanced_channels", [])
 
+        skip_pubkeys = set(self.cfg["rebalancing"].get("skip_pubkeys", []))
+
         decisions = []
         for ch in imbalanced:
+            if ch.get("peer_pubkey") in skip_pubkeys:
+                continue
             if ch.get("local_balance_pct", 100) > trigger_pct:
                 continue
             ch_id = ch.get("chan_id")

@@ -42,6 +42,9 @@ credentials:
 # Rebalancing thresholds
 # ─────────────────────────────────────────
 rebalancing:
+  # Pubkeys to exclude from all agent decisions (AR, AF, Loop In)
+  skip_pubkeys: []
+
   # Channel is considered imbalanced outside this range
   min_local_balance_pct: 20
   max_local_balance_pct: 80
