@@ -55,6 +55,67 @@ def index():
     return send_from_directory(_HERE, "index.html")
 
 
+def _lnd_rest_session(config):
+    """Return (base_url, headers, verify) for LND REST calls."""
+    creds = config["credentials"]
+    ep = config["endpoints"]
+    mac_path = creds.get("lit_macaroon_path", "")
+    tls_cert = creds.get("lnd_tls_cert_path", "") or False
+    try:
+        mac_hex = Path(mac_path).read_bytes().hex()
+    except Exception:
+        mac_hex = ""
+    lnd_ip = ep["lnd_grpc"].split(":")[0]
+    base = f"https://{lnd_ip}:8080"
+    headers = {"Grpc-Metadata-macaroon": mac_hex} if mac_hex else {}
+    return base, headers, tls_cert
+
+
+@app.route("/api/node/info")
+def api_node_info():
+    """LND node summary: sync status, block height, wallet balances, pending HTLCs."""
+    config = load_config()
+    base, headers, verify = _lnd_rest_session(config)
+    if not headers:
+        return jsonify({"error": "macaroon not available"}), 503
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+            f_info    = ex.submit(requests.get, f"{base}/v1/getinfo",
+                                  headers=headers, verify=verify, timeout=8)
+            f_onchain = ex.submit(requests.get, f"{base}/v1/balance/blockchain",
+                                  headers=headers, verify=verify, timeout=8)
+            f_ln      = ex.submit(requests.get, f"{base}/v1/balance/channels",
+                                  headers=headers, verify=verify, timeout=8)
+            f_pending = ex.submit(requests.get, f"{base}/v1/channels",
+                                  headers=headers, verify=verify, timeout=8)
+
+        info    = f_info.result().json()
+        onchain = f_onchain.result().json()
+        ln      = f_ln.result().json()
+        chans   = f_pending.result().json().get("channels", [])
+
+        pending_htlcs = sum(len(c.get("pending_htlcs", [])) for c in chans)
+        htlc_sats     = sum(
+            int(h.get("amount", 0)) for c in chans for h in c.get("pending_htlcs", [])
+        )
+
+        return jsonify({
+            "alias":            info.get("alias", ""),
+            "pubkey":           info.get("identity_pubkey", ""),
+            "block_height":     info.get("block_height", 0),
+            "synced_to_chain":  info.get("synced_to_chain", False),
+            "synced_to_graph":  info.get("synced_to_graph", False),
+            "onchain_confirmed_sats": int(onchain.get("confirmed_balance", 0)),
+            "onchain_unconfirmed_sats": int(onchain.get("unconfirmed_balance", 0)),
+            "ln_local_sats":    int(ln.get("local_balance", {}).get("sat", 0)),
+            "ln_remote_sats":   int(ln.get("remote_balance", {}).get("sat", 0)),
+            "pending_htlcs":    pending_htlcs,
+            "htlc_sats":        htlc_sats,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 503
+
+
 @app.route("/api/mempool")
 def api_mempool():
     config = load_config()
@@ -226,6 +287,84 @@ def api_stats():
             "rebalance_cost_7d_sats": round(rebalance_cost_7d, 3),
             "cost_ratio_pct": cost_ratio,
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 503
+
+
+@app.route("/api/earnings")
+def api_earnings():
+    """Per-channel 7-day routing revenue, rebalance cost, and net earnings."""
+    config = load_config()
+    base = config["endpoints"]["lndg_api"]
+    auth = HTTPBasicAuth(config["credentials"]["lndg_user"], config["credentials"]["lndg_pass"])
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=7)
+        channels = {
+            c["chan_id"]: {"alias": c.get("alias", c.get("chan_id", "")),
+                           "pubkey": c.get("remote_pubkey", ""),
+                           "revenue": 0.0, "rebalance": 0.0}
+            for c in requests.get(f"{base}/api/channels/?limit=200", auth=auth, timeout=10)
+                                  .json().get("results", [])
+            if c.get("is_open")
+        }
+
+        fwds = requests.get(f"{base}/api/forwards/?limit=2000", auth=auth, timeout=10).json()
+        for f in fwds.get("results", []):
+            try:
+                dt = datetime.fromisoformat(f["forward_date"].replace("Z", "+00:00"))
+                if dt.replace(tzinfo=None) < cutoff:
+                    continue
+                for key in ("chan_id_in", "chan_id_out"):
+                    cid = f.get(key)
+                    if cid and cid in channels:
+                        channels[cid]["revenue"] += (f.get("fee", 0) or 0) / 2
+            except Exception:
+                pass
+
+        pays = requests.get(f"{base}/api/payments/?limit=1000", auth=auth, timeout=10).json()
+        for p in pays.get("results", []):
+            if p.get("rebal_chan") is None or p.get("status") != 2:
+                continue
+            fee = p.get("fee", 0) or 0
+            if fee <= 0:
+                continue
+            try:
+                dt = datetime.fromisoformat(p["creation_date"].replace("Z", "+00:00"))
+                if dt.replace(tzinfo=None) < cutoff:
+                    continue
+                cid = str(p["rebal_chan"])
+                if cid in channels:
+                    channels[cid]["rebalance"] += fee
+            except Exception:
+                pass
+
+        rows = []
+        for cid, d in channels.items():
+            rev = round(d["revenue"], 1)
+            reb = round(d["rebalance"], 1)
+            rows.append({
+                "chan_id": cid,
+                "alias": d["alias"],
+                "pubkey": d["pubkey"],
+                "revenue_7d": rev,
+                "rebalance_7d": reb,
+                "net_7d": round(rev - reb, 1),
+            })
+        rows.sort(key=lambda r: r["revenue_7d"], reverse=True)
+        return jsonify({"channels": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 503
+
+
+@app.route("/api/alerts/history")
+def api_alerts_history():
+    """Recent Telegram alerts fired by the heartbeat monitor and agent."""
+    log_path = Path(_REPO_ROOT) / "agent" / "logs" / "alert_history.json"
+    if not log_path.exists():
+        return jsonify({"alerts": []})
+    try:
+        with open(log_path) as f:
+            return jsonify(json.load(f))
     except Exception as e:
         return jsonify({"error": str(e)}), 503
 

@@ -231,6 +231,30 @@
   .bell-wrap svg{width:18px;height:18px;}
   .bell-badge{position:absolute;top:2px;right:2px;min-width:17px;height:17px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:var(--mono);line-height:1;border:2px solid var(--bg);pointer-events:none;}
 
+  /* ── Node info bar ──────────────────────────────────── */
+  #node-info-bar{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;flex-shrink:0;}
+  .nib-item{display:flex;flex-direction:column;padding:7px 18px;border-right:1px solid var(--border);white-space:nowrap;min-width:0;}
+  .nib-item:last-child{border-right:none;}
+  .nib-label{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:2px;}
+  .nib-value{font-size:12px;font-family:var(--mono);color:var(--text);font-weight:500;}
+  .nib-value.ok{color:var(--green);}
+  .nib-value.warn{color:var(--amber);}
+  .nib-value.err{color:var(--red);}
+
+  /* ── Earnings table ──────────────────────────────────── */
+  .earn-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .earn-table th{padding:8px 12px;text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);font-weight:600;}
+  .earn-table th.num,.earn-table td.num{text-align:right;}
+  .earn-table td{padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);color:var(--text2);}
+  .earn-table tr:last-child td{border-bottom:none;}
+  .earn-table tr:hover td{background:var(--surface2);}
+  .earn-alias{font-size:12px;font-weight:500;color:var(--text);font-family:inherit;}
+  .earn-pos{color:var(--green);}
+  .earn-neg{color:var(--red);}
+  .earn-bar-wrap{width:80px;height:6px;background:var(--border);border-radius:3px;display:inline-block;vertical-align:middle;}
+  .earn-bar{height:6px;border-radius:3px;background:var(--green);}
+  .earn-bar.neg{background:var(--red);}
+
   /* ── Node link popup ────────────────────────────────── */
   #node-popup{
     display:none;position:fixed;z-index:1100;
@@ -328,6 +352,10 @@
         Bookmarks
         <span class="nav-badge" id="bookmark-badge" style="display:none">0</span>
       </div>
+      <div class="nav-item" data-view="earnings" onclick="switchView('earnings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Earnings
+      </div>
     </nav>
     <div class="status-bar">
       <div class="status-dot" id="agent-dot"></div>
@@ -370,6 +398,42 @@
           </svg>
           <span class="bell-badge" id="bell-badge" style="display:none">0</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Node info bar -->
+    <div id="node-info-bar">
+      <div class="nib-item">
+        <div class="nib-label">Block</div>
+        <div class="nib-value" id="nib-block">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">Chain</div>
+        <div class="nib-value" id="nib-chain">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">Graph</div>
+        <div class="nib-value" id="nib-graph">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">On-chain</div>
+        <div class="nib-value" id="nib-onchain">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">LN Local</div>
+        <div class="nib-value" id="nib-ln-local">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">LN Remote</div>
+        <div class="nib-value" id="nib-ln-remote">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">Pending HTLCs</div>
+        <div class="nib-value" id="nib-htlcs">–</div>
+      </div>
+      <div class="nib-item">
+        <div class="nib-label">SCB Age</div>
+        <div class="nib-value" id="nib-scb">–</div>
       </div>
     </div>
 
@@ -671,6 +735,27 @@
       </div>
     </div><!-- /view-bookmarks -->
 
+    <div class="view" id="view-earnings">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Channel Earnings · 7 days</div>
+          <span class="panel-action" onclick="refreshEarnings()">Refresh →</span>
+        </div>
+        <div class="panel-body" style="padding:0;overflow-x:auto;">
+          <table class="earn-table">
+            <thead><tr>
+              <th>Channel</th>
+              <th class="num">Revenue</th>
+              <th class="num">Rebalance</th>
+              <th class="num">Net</th>
+              <th>Activity</th>
+            </tr></thead>
+            <tbody id="earn-tbody"><tr><td colspan="5" class="empty-state">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /view-earnings -->
+
     </div><!-- /content -->
   </div>
 </div>
@@ -881,8 +966,76 @@ async function respond(id,outcome){
 function toggleMode(){alert('Edit dry_run in config/config.yml and restart the agent to toggle live mode.');}
 
 async function refreshAll(){
-  await Promise.allSettled([refreshStatus(),refreshStats(),refreshChannels(),refreshMempool(),refreshLog(),refreshApprovals()]);
+  await Promise.allSettled([refreshStatus(),refreshStats(),refreshChannels(),refreshMempool(),refreshLog(),refreshApprovals(),refreshNodeInfo()]);
   document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+// ── Node info bar ─────────────────────────────────────────
+async function refreshNodeInfo(){
+  try {
+    const [nodeData, safetyData] = await Promise.all([
+      fetch('/api/node/info').then(r=>r.json()),
+      fetch('/api/safety').then(r=>r.json()),
+    ]);
+
+    const fmt = n => n == null ? '–' : Number(n).toLocaleString() + ' sats';
+
+    document.getElementById('nib-block').textContent =
+      nodeData.block_height ? nodeData.block_height.toLocaleString() : '–';
+
+    const chainEl = document.getElementById('nib-chain');
+    chainEl.textContent = nodeData.synced_to_chain ? 'Synced ✓' : 'Behind ✗';
+    chainEl.className = 'nib-value ' + (nodeData.synced_to_chain ? 'ok' : 'err');
+
+    const graphEl = document.getElementById('nib-graph');
+    graphEl.textContent = nodeData.synced_to_graph ? 'Synced ✓' : 'Behind ✗';
+    graphEl.className = 'nib-value ' + (nodeData.synced_to_graph ? 'ok' : 'warn');
+
+    document.getElementById('nib-onchain').textContent = fmt(nodeData.onchain_confirmed_sats);
+    document.getElementById('nib-ln-local').textContent = fmt(nodeData.ln_local_sats);
+    document.getElementById('nib-ln-remote').textContent = fmt(nodeData.ln_remote_sats);
+
+    const htlcEl = document.getElementById('nib-htlcs');
+    htlcEl.textContent = nodeData.pending_htlcs > 0
+      ? `${nodeData.pending_htlcs} (${Number(nodeData.htlc_sats).toLocaleString()} sats)`
+      : '0';
+    htlcEl.className = 'nib-value ' + (nodeData.pending_htlcs > 0 ? 'warn' : 'ok');
+
+    const scbEl = document.getElementById('nib-scb');
+    if(safetyData.scb_age_hours != null){
+      const age = safetyData.scb_age_hours;
+      scbEl.textContent = age < 1 ? '<1h old' : `${age}h old`;
+      scbEl.className = 'nib-value ' + (safetyData.scb_ok ? 'ok' : 'err');
+    } else {
+      scbEl.textContent = 'Not found';
+      scbEl.className = 'nib-value err';
+    }
+  } catch(e){ console.warn('node info bar error', e); }
+}
+
+// ── Earnings table ────────────────────────────────────────
+async function refreshEarnings(){
+  const tbody = document.getElementById('earn-tbody');
+  try {
+    const d = await fetch('/api/earnings').then(r=>r.json());
+    if(d.error){ tbody.innerHTML=`<tr><td colspan="5" class="empty-state">${d.error}</td></tr>`; return; }
+    const rows = d.channels;
+    if(!rows.length){ tbody.innerHTML='<tr><td colspan="5" class="empty-state">No channel data</td></tr>'; return; }
+
+    const maxRev = Math.max(...rows.map(r=>r.revenue_7d), 1);
+    tbody.innerHTML = rows.map(r => {
+      const netClass = r.net_7d > 0 ? 'earn-pos' : r.net_7d < 0 ? 'earn-neg' : '';
+      const netSign  = r.net_7d > 0 ? '+' : '';
+      const barPct   = Math.round((r.revenue_7d / maxRev) * 100);
+      return `<tr>
+        <td><span class="earn-alias peer-name" data-alias="${r.alias}" data-pubkey="${r.pubkey}">${r.alias}</span></td>
+        <td class="num">${r.revenue_7d.toLocaleString()}</td>
+        <td class="num">${r.rebalance_7d.toLocaleString()}</td>
+        <td class="num ${netClass}">${netSign}${r.net_7d.toLocaleString()}</td>
+        <td><span class="earn-bar-wrap"><span class="earn-bar${r.net_7d<0?' neg':''}" style="width:${barPct}%"></span></span></td>
+      </tr>`;
+    }).join('');
+  } catch(e){ tbody.innerHTML='<tr><td colspan="5" class="empty-state">Error loading earnings</td></tr>'; }
 }
 
 // ── Pool Browser ─────────────────────────────────────────
@@ -1267,6 +1420,7 @@ const _VIEW_META = {
   pool:        ['Pool Browser', 'LN+ Liquidity Pool — scored against Seoul Node Runner state'],
   peerscout:   ['Peer Scout',   'Suggested nodes to open channels with — hover for details'],
   bookmarks:   ['Bookmarks',   'Saved peers — click name to open on Amboss'],
+  earnings:    ['Earnings',    '7-day routing revenue vs rebalance cost by channel'],
 };
 
 function switchView(name) {
@@ -1280,7 +1434,8 @@ function switchView(name) {
   ({overview:refreshAll,channels:refreshChannelDetail,cyclelog:refreshCycleLog,
     approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
     feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety,
-    pool:refreshPool,peerscout:refreshPeerScout,bookmarks:refreshBookmarks}
+    pool:refreshPool,peerscout:refreshPeerScout,bookmarks:refreshBookmarks,
+    earnings:refreshEarnings}
   )[name]?.();
 }
 
