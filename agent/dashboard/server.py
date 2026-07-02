@@ -55,6 +55,70 @@ def index():
     return send_from_directory(_HERE, "index.html")
 
 
+@app.route("/api/mining")
+def api_mining():
+    """Solo mining stats from public-pool."""
+    config = load_config()
+    pool_api = config["endpoints"].get("public_pool_api", "http://10.21.0.32:2019")
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+            f_pool    = ex.submit(requests.get, f"{pool_api}/api/pool",    timeout=5)
+            f_info    = ex.submit(requests.get, f"{pool_api}/api/info",    timeout=5)
+            f_network = ex.submit(requests.get, f"{pool_api}/api/network", timeout=5)
+
+        pool    = f_pool.result().json()
+        info    = f_info.result().json()
+        network = f_network.result().json()
+
+        hashrate = pool.get("totalHashRate", 0)
+        net_hash = network.get("networkhashps", 0)
+        difficulty = network.get("difficulty", 0)
+
+        # Expected seconds per block at current hashrate
+        if hashrate > 0 and difficulty > 0:
+            expected_seconds = (difficulty * 2**32) / hashrate
+            expected_days = round(expected_seconds / 86400, 1)
+        else:
+            expected_days = None
+
+        share_pct = round((hashrate / net_hash) * 100, 8) if net_hash else 0
+
+        # Format hashrate human-readable
+        def fmt_hash(h):
+            for unit in ["H/s","KH/s","MH/s","GH/s","TH/s","PH/s","EH/s"]:
+                if h < 1000:
+                    return f"{h:.2f} {unit}"
+                h /= 1000
+            return f"{h:.2f} ZH/s"
+
+        # Best difficulty from info
+        best_diff = 0
+        for hs in info.get("highScores", []):
+            d = hs.get("bestDifficulty", 0)
+            if d > best_diff:
+                best_diff = d
+
+        user_agents = info.get("userAgents", [])
+        miner_info = user_agents[0].get("userAgent", "unknown") if user_agents else "unknown"
+
+        return jsonify({
+            "hashrate_raw":    hashrate,
+            "hashrate":        fmt_hash(hashrate),
+            "net_hashrate":    fmt_hash(net_hash),
+            "difficulty":      round(difficulty / 1e12, 2),  # in terahash equiv
+            "share_pct":       share_pct,
+            "miners":          pool.get("totalMiners", 0),
+            "blocks_found":    len(pool.get("blocksFound", [])),
+            "expected_days":   expected_days,
+            "best_difficulty": round(best_diff / 1e9, 2),  # in gigahash
+            "miner":           miner_info,
+            "block_height":    pool.get("blockHeight", 0),
+            "uptime":          info.get("uptime", ""),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 503
+
+
 def _lnd_rest_session(config):
     """Return (base_url, headers, verify) for LND REST calls."""
     creds = config["credentials"]
@@ -263,29 +327,48 @@ def api_stats():
             except Exception:
                 pass
 
-        # Rebalance cost: circular payments tagged with a destination channel
-        pay_r = requests.get(f"{base}/api/payments/?limit=500", auth=auth, timeout=10).json()
+        # Rebalance cost + success rate
+        pay_r = requests.get(f"{base}/api/payments/?limit=1000", auth=auth, timeout=10).json()
         rebalance_cost_7d = 0
+        reb_success = 0
+        reb_failed = 0
         for p in pay_r.get("results", []):
             if p.get("rebal_chan") is None:
                 continue
-            if p.get("status") != 2:
-                continue
-            fee = p.get("fee", 0) or 0
-            if fee <= 0:
-                continue
             try:
                 dt = datetime.fromisoformat(p["creation_date"].replace("Z", "+00:00"))
-                if dt.replace(tzinfo=None) >= cutoff:
-                    rebalance_cost_7d += fee
+                if dt.replace(tzinfo=None) < cutoff:
+                    continue
             except Exception:
-                pass
+                continue
+            if p.get("status") == 2:
+                reb_success += 1
+                fee = p.get("fee", 0) or 0
+                if fee > 0:
+                    rebalance_cost_7d += fee
+            elif p.get("status") == 3:
+                reb_failed += 1
 
+        reb_total = reb_success + reb_failed
+        reb_success_pct = round((reb_success / reb_total) * 100, 1) if reb_total else None
+        avg_cost_per_success = round(rebalance_cost_7d / reb_success, 1) if reb_success else 0
         cost_ratio = round((rebalance_cost_7d / revenue_7d) * 100, 1) if revenue_7d else 0
+
+        # Earnings projection (annualise 7d revenue)
+        monthly_projection = round(revenue_7d / 7 * 30, 0)
+        annual_projection  = round(revenue_7d / 7 * 365, 0)
+
         return jsonify({
-            "revenue_7d_sats": round(revenue_7d, 3),
+            "revenue_7d_sats":        round(revenue_7d, 3),
             "rebalance_cost_7d_sats": round(rebalance_cost_7d, 3),
-            "cost_ratio_pct": cost_ratio,
+            "cost_ratio_pct":         cost_ratio,
+            "reb_success":            reb_success,
+            "reb_failed":             reb_failed,
+            "reb_total":              reb_total,
+            "reb_success_pct":        reb_success_pct,
+            "avg_cost_per_success":   avg_cost_per_success,
+            "monthly_projection_sats": monthly_projection,
+            "annual_projection_sats":  annual_projection,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 503

@@ -17,6 +17,24 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+_ALERT_LOG = Path("agent/logs/alert_history.json")
+MAX_ALERT_HISTORY = 200
+
+
+def _log_alert(source: str, text: str):
+    _ALERT_LOG.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        history = json.loads(_ALERT_LOG.read_text()) if _ALERT_LOG.exists() else {"alerts": []}
+    except Exception:
+        history = {"alerts": []}
+    history["alerts"].insert(0, {
+        "ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "source": source,
+        "text": text.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", ""),
+    })
+    history["alerts"] = history["alerts"][:MAX_ALERT_HISTORY]
+    _ALERT_LOG.write_text(json.dumps(history, indent=2))
+
 log = logging.getLogger("approval.alby")
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
@@ -57,6 +75,7 @@ class AlbyApprovalGate:
         self._write_approval(approval)
         self._notify_alby(approval)
         self._notify_telegram(approval)
+        _log_alert("approval", f"[{approval['priority'].upper()}] {decision.summary}")
         log.info(f"Approval request {request_id} written: {decision.summary}")
         return request_id
 

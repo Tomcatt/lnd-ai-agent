@@ -22,6 +22,7 @@ endpoints:
   albyhub_api: "http://albyhub_server_1:8080"
   mempool_api: "http://mempool_api_1:8999"
   lightning_terminal: "https://lightning-terminal_web_1:8443"
+  public_pool_api: "http://public-pool_server_1:2019"
 
 # ─────────────────────────────────────────
 # API credentials (fill these in)

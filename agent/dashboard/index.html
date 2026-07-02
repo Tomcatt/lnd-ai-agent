@@ -38,7 +38,7 @@
   .btn-primary:hover{background:#7dd3fc;color:#000;}
   .btn-live{background:rgba(67,209,122,.15);color:var(--green);border-color:rgba(67,209,122,.4);}
   .content{padding:24px 28px;overflow-y:auto;flex:1;}
-  .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;position:relative;overflow:hidden;}
   .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
   .stat-card.green::before{background:var(--green);}
@@ -356,6 +356,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         Earnings
       </div>
+      <div class="nav-item" data-view="alerts" onclick="switchView('alerts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Alert History
+      </div>
+      <div class="nav-item" data-view="mining" onclick="switchView('mining')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Mining
+      </div>
     </nav>
     <div class="status-bar">
       <div class="status-dot" id="agent-dot"></div>
@@ -469,6 +477,18 @@
           <div class="stat-value" id="stat-fee-rate">–</div>
           <div class="stat-sub" id="stat-fee-sub">sat/vB</div>
           <div class="stat-change" id="stat-fee-mode" style="color:var(--text2)">loading...</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Rebalance success · 7d</div>
+          <div class="stat-value" id="stat-reb-pct">–</div>
+          <div class="stat-sub" id="stat-reb-counts">loading...</div>
+          <div class="stat-change" id="stat-reb-avg" style="color:var(--text2)">avg cost/success</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Projected monthly</div>
+          <div class="stat-value" id="stat-proj-month">–</div>
+          <div class="stat-sub">sats / month</div>
+          <div class="stat-change" id="stat-proj-year" style="color:var(--text2)">loading...</div>
         </div>
       </div>
 
@@ -756,6 +776,63 @@
       </div>
     </div><!-- /view-earnings -->
 
+    <div class="view" id="view-alerts">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Alert History</div>
+          <span class="panel-action" onclick="refreshAlertHistory()">Refresh →</span>
+        </div>
+        <div class="panel-body" style="padding:0;overflow-x:auto;">
+          <table class="earn-table">
+            <thead><tr>
+              <th style="width:150px">Time</th>
+              <th style="width:100px">Source</th>
+              <th>Message</th>
+            </tr></thead>
+            <tbody id="alerts-tbody"><tr><td colspan="3" class="empty-state">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /view-alerts -->
+
+    <div class="view" id="view-mining">
+      <div class="stats-grid" id="mining-stats-grid">
+        <div class="stat-card amber">
+          <div class="stat-label">Pool Hashrate</div>
+          <div class="stat-value" id="mine-hashrate" style="font-size:20px">–</div>
+          <div class="stat-sub" id="mine-miner">loading...</div>
+          <div class="stat-change" id="mine-miners" style="color:var(--text2)">–</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Network Hashrate</div>
+          <div class="stat-value" id="mine-nethash" style="font-size:20px">–</div>
+          <div class="stat-sub" id="mine-share">–</div>
+          <div class="stat-change" id="mine-diff" style="color:var(--text2)">–</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Best Difficulty</div>
+          <div class="stat-value" id="mine-best" style="font-size:20px">–</div>
+          <div class="stat-sub">GH equivalent</div>
+          <div class="stat-change" id="mine-blocks" style="color:var(--text2)">–</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Expected Block</div>
+          <div class="stat-value" id="mine-expected" style="font-size:20px">–</div>
+          <div class="stat-sub">days at current rate</div>
+          <div class="stat-change" style="color:var(--text2)">solo probability</div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:0">
+        <div class="panel-header">
+          <div class="panel-title">Solo Mining · Public Pool</div>
+          <span class="panel-action" onclick="refreshMining()">Refresh →</span>
+        </div>
+        <div class="panel-body">
+          <div id="mining-detail" style="font-family:var(--mono);font-size:12px;color:var(--text2);line-height:1.8">Loading...</div>
+        </div>
+      </div>
+    </div><!-- /view-mining -->
+
     </div><!-- /content -->
   </div>
 </div>
@@ -845,7 +922,82 @@ async function refreshStats(){
     const el=document.getElementById('stat-rebalance-sub');
     el.textContent=`${r}% of revenue`;
     el.className='stat-change '+(r<20?'up':r<50?'':'down');
+
+    // Rebalance success rate
+    if(d.reb_success_pct != null){
+      document.getElementById('stat-reb-pct').textContent = d.reb_success_pct + '%';
+      document.getElementById('stat-reb-counts').textContent =
+        `${d.reb_success} ok · ${d.reb_failed} failed`;
+      document.getElementById('stat-reb-avg').textContent =
+        d.avg_cost_per_success ? `${d.avg_cost_per_success} sats/success` : 'no successes';
+    } else {
+      document.getElementById('stat-reb-pct').textContent = '—';
+      document.getElementById('stat-reb-counts').textContent = 'no rebalances';
+    }
+
+    // Earnings projection
+    document.getElementById('stat-proj-month').textContent =
+      Number(d.monthly_projection_sats).toLocaleString();
+    document.getElementById('stat-proj-year').textContent =
+      Number(d.annual_projection_sats).toLocaleString() + ' sats/yr';
   }catch(e){document.getElementById('stat-revenue').textContent='err';}
+}
+
+// ── Mining stats ──────────────────────────────────────────
+async function refreshMining(){
+  try {
+    const d = await fetch('/api/mining').then(r=>r.json());
+    if(d.error){ document.getElementById('mining-detail').textContent = d.error; return; }
+
+    document.getElementById('mine-hashrate').textContent  = d.hashrate;
+    document.getElementById('mine-miner').textContent     = d.miner;
+    document.getElementById('mine-miners').textContent    = `${d.miners} miner(s) connected`;
+    document.getElementById('mine-nethash').textContent   = d.net_hashrate;
+    document.getElementById('mine-share').textContent     = `${d.share_pct.toFixed(8)}% of network`;
+    document.getElementById('mine-diff').textContent      = `Difficulty: ${d.difficulty} TH equiv`;
+    document.getElementById('mine-best').textContent      = d.best_difficulty.toLocaleString();
+    document.getElementById('mine-blocks').textContent    = `${d.blocks_found} block(s) found`;
+
+    const expEl = document.getElementById('mine-expected');
+    if(d.expected_days){
+      expEl.textContent = d.expected_days > 9999
+        ? `${(d.expected_days/365).toFixed(0)} yrs`
+        : `${d.expected_days.toLocaleString()}d`;
+    } else { expEl.textContent = '–'; }
+
+    const uptime = d.uptime ? new Date(d.uptime).toLocaleString() : '–';
+    document.getElementById('mining-detail').innerHTML = `
+      <div>Block height: <span style="color:var(--text)">${(d.block_height||0).toLocaleString()}</span></div>
+      <div>Pool online since: <span style="color:var(--text)">${uptime}</span></div>
+      <div>Best share ever: <span style="color:var(--cyan)">${d.best_difficulty.toLocaleString()} GH</span></div>
+      <div>Blocks found: <span style="color:var(--${d.blocks_found>0?'green':'text2'})">${d.blocks_found}</span></div>
+      <div>Expected time to block: <span style="color:var(--amber)">${d.expected_days ? d.expected_days.toLocaleString()+' days' : '–'}</span></div>
+    `;
+  } catch(e){ document.getElementById('mining-detail').textContent = 'Error loading mining stats'; }
+}
+
+// ── Alert history ─────────────────────────────────────────
+async function refreshAlertHistory(){
+  const tbody = document.getElementById('alerts-tbody');
+  try {
+    const d = await fetch('/api/alerts/history').then(r=>r.json());
+    const alerts = d.alerts || [];
+    if(!alerts.length){
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No alerts recorded yet</td></tr>';
+      return;
+    }
+    const sourceColor = {heartbeat:'var(--amber)', approval:'var(--cyan)', agent:'var(--green)'};
+    tbody.innerHTML = alerts.map(a => {
+      const col = sourceColor[a.source] || 'var(--text2)';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${a.ts}</td>
+        <td><span style="font-size:11px;font-family:var(--mono);color:${col}">${a.source}</span></td>
+        <td style="font-size:12px">${a.text}</td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Error loading alert history</td></tr>';
+  }
 }
 
 let _chData=[], _chSort={col:null,dir:1};
@@ -1421,6 +1573,8 @@ const _VIEW_META = {
   peerscout:   ['Peer Scout',   'Suggested nodes to open channels with — hover for details'],
   bookmarks:   ['Bookmarks',   'Saved peers — click name to open on Amboss'],
   earnings:    ['Earnings',    '7-day routing revenue vs rebalance cost by channel'],
+  alerts:      ['Alert History', 'Telegram alerts fired by heartbeat monitor and approval gate'],
+  mining:      ['Solo Mining',   'Public Pool stats — hashrate, difficulty, expected block time'],
 };
 
 function switchView(name) {
@@ -1435,7 +1589,7 @@ function switchView(name) {
     approvals:refreshApprovalsView,rebalancing:refreshRebalancingHistory,
     feepolicy:refreshFeePolicyHistory,connections:refreshConnections,safety:refreshSafety,
     pool:refreshPool,peerscout:refreshPeerScout,bookmarks:refreshBookmarks,
-    earnings:refreshEarnings}
+    earnings:refreshEarnings, alerts:refreshAlertHistory, mining:refreshMining}
   )[name]?.();
 }
 

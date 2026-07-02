@@ -4,6 +4,7 @@ Sends Telegram alert on state changes (down → up, up → down).
 Auto-restarts Umbrel UI when port 80 is dead.
 """
 
+import json
 import subprocess
 import sys
 import time
@@ -18,9 +19,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("heartbeat")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_ALERT_LOG  = _REPO_ROOT / "agent" / "logs" / "alert_history.json"
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 CHECK_INTERVAL = 60   # seconds
 UMBREL_RESTART_COOLDOWN = 300  # don't restart more than once per 5 min
+MAX_ALERT_HISTORY = 200
+
+
+def log_alert(source: str, text: str):
+    """Append an alert entry to the shared alert_history.json file."""
+    _ALERT_LOG.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        history = json.loads(_ALERT_LOG.read_text()) if _ALERT_LOG.exists() else {"alerts": []}
+    except Exception:
+        history = {"alerts": []}
+    history["alerts"].insert(0, {
+        "ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "source": source,
+        "text": text.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", ""),
+    })
+    history["alerts"] = history["alerts"][:MAX_ALERT_HISTORY]
+    _ALERT_LOG.write_text(json.dumps(history, indent=2))
 
 
 def load_config():
@@ -119,6 +138,7 @@ def run():
 
     def alert(text):
         log.info(f"ALERT: {text}")
+        log_alert("heartbeat", text)
         if tg_token and tg_chat:
             send_telegram(tg_token, tg_chat, text)
 
